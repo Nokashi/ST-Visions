@@ -18,12 +18,12 @@ import bokeh.plotting as bokeh_plt
 import bokeh.models as bokeh_mdl
 import bokeh.palettes as palettes
 
-from bokeh.tile_providers import get_provider, Vendors
-from bokeh.plotting import figure, output_file, reset_output, output_notebook, save, show
+from bokeh.plotting import figure, reset_output, output_notebook, show
 from bokeh.models import ColumnDataSource, CDSView, HoverTool, WheelZoomTool, GroupFilter, BooleanFilter, CustomJS, Slider, DateSlider
-from bokeh.layouts import column, widgetbox, row
+from bokeh.layouts import column, row
 
 # Importing Helper Libraries
+sys.path.append(os.path.join(os.path.dirname(__file__)))
 import geom_helper
 import callbacks
 
@@ -301,7 +301,7 @@ class st_visualizer:
         return self.cmap
 
     
-    def add_numerical_colormap(self, palette, numeric_name, nan_color='gray', colorbar=True, cb_orientation='vertical', cb_location='right', label_standoff=12, border_line_color=None, location=(0,0), **kwargs): 
+    def add_numerical_colormap(self, palette, numeric_name, val_range=None, nan_color='gray', colorbar=True, cb_orientation='vertical', cb_location='right', label_standoff=12, border_line_color=None, location=(0,0), **kwargs): 
         """
         Create a Numerical Colormap.
             
@@ -333,11 +333,16 @@ class st_visualizer:
         cmap: Dict
             The Numerical Colormap 
         """
-        if palette not in ALLOWED_NUMERICAL_COLOR_PALETTES:
-            raise ValueError(f'Invalid Palette Name. Allowed (pre-built) Palettes: {ALLOWED_NUMERICAL_COLOR_PALETTES}')
+        if palette not in ALLOWED_NUMERICAL_COLOR_PALETTES and not isinstance(palette, palettes.Palette.__origin__):
+            raise ValueError(f'Invalid Palette. Allowed (pre-built) Palettes: {ALLOWED_NUMERICAL_COLOR_PALETTES}')
 
-        min_val, max_val = self.data[numeric_name].agg([np.min, np.max])
-        cmap = bokeh_mdl.LinearColorMapper(palette=getattr(palettes, palette), low=min_val, high=max_val, nan_color=nan_color)
+        min_val, max_val = self.data[numeric_name].agg([np.min, np.max]) if val_range is None else val_range
+        cmap = bokeh_mdl.LinearColorMapper(
+            palette=getattr(palettes, palette) if palette in ALLOWED_NUMERICAL_COLOR_PALETTES else palette, 
+            low=min_val, 
+            high=max_val, 
+            nan_color=nan_color
+        )
         
         if colorbar:
             cbar = bokeh_mdl.ColorBar(orientation=cb_orientation, color_mapper=cmap, label_standoff=label_standoff, border_line_color=border_line_color, location=location, **kwargs) # Other Params: height=height, width=width
@@ -464,36 +469,6 @@ class st_visualizer:
         self.renderers.append(renderer)
 
         return renderer
-        
-    
-    def add_map_tile(self, provider, retina=True, level='underlay', **kwargs):
-        """
-        Add a Map Tile to the Canvas
-            
-        Parameters
-        ----------
-        provider: str
-            A map tile provider (available: CARTODBPOSITRON, STAMEN_TERRAIN, STAMEN_TONER, STAMEN_TONER_BACKGROUND, STAMEN_TONER_LABELS)
-        retina: boolean (default:True)            
-            If True, tiles will be downloaded in Retina Resolution (some providers do not offer retina resolution)        
-        level: str (default: ```'underlay'```)
-            The z-order of the map tiles. 'underlay' means that the map tiles will be always at the back of the plot (i.e., z-order=0)
-        **kwargs: Dict
-            Other parameters related to the map tile creation
-        """
-        if provider == 'CARTODBPOSITRON':
-            vendor = Vendors.CARTODBPOSITRON_RETINA if retina else Vendors.CARTODBPOSITRON
-        elif provider == 'STAMEN_TERRAIN':
-            vendor = Vendors.STAMEN_TERRAIN_RETINA if retina else Vendors.STAMEN_TERRAIN
-        elif provider == 'STAMEN_TONER':
-            vendor = Vendors.STAMEN_TONER
-        elif provider == 'STAMEN_TONER_BACKGROUND':
-            vendor = Vendors.STAMEN_TONER_BACKGROUND
-        elif provider == 'STAMEN_TONER_LABELS':   
-            vendor = Vendors.STAMEN_TONER_LABELS
-        
-        tile_provider = get_provider(vendor)
-        self.figure.add_tile(tile_provider, level=level, **kwargs)
 
     
     def add_hover_tooltips(self, tooltips, **kwargs):
@@ -523,7 +498,7 @@ class st_visualizer:
         self.figure.add_tools(bokeh_mdl.LassoSelectTool(**kwargs))
 
 
-    def add_temporal_filter(self, temporal_name='ts', temporal_unit='s', step_ms=3600000, title='Temporal Horizon', height_policy='min', callback_policy='value_throttled', callback_class=None, **kwargs):
+    def add_temporal_filter(self, temporal_name='ts', temporal_unit='s', step_ms=3600000, start_date=None, end_date=None, title='Temporal Horizon', height_policy='min', callback_policy='value_throttled', callback_class=None, **kwargs):
         """
         Add a Temporal Filter to the Canvas
         
@@ -552,8 +527,8 @@ class st_visualizer:
 
         step = step_ms
 
-        start_date = pd.to_datetime(self.data[temporal_name].min(), unit=temporal_unit)
-        end_date   = pd.to_datetime(self.data[temporal_name].max(), unit=temporal_unit)
+        start_date = pd.to_datetime(self.data[temporal_name].min(), unit=temporal_unit) if start_date is None else start_date
+        end_date   = pd.to_datetime(self.data[temporal_name].max(), unit=temporal_unit) if end_date is None else end_date
 
         temp_filter = bokeh_mdl.DateRangeSlider(start=start_date, end=end_date, value=(start_date, end_date), step=step, title=title, height_policy=height_policy, **kwargs)
         temp_filter.format = '%d %b %Y %H:%M:%S.%3N'
@@ -581,6 +556,8 @@ class st_visualizer:
         
         temp_filter.on_change(callback_policy, callback_class(self, temp_filter).callback)
         self.widgets.append(temp_filter)
+
+        return temp_filter
 
     
     def add_categorical_filter(self, title='Category', categorical_name='City_Country', height_policy='min', callback_class=None, **kwargs):
@@ -630,6 +607,8 @@ class st_visualizer:
 
         cat_filter.on_change('value', callback_class(self, cat_filter).callback)
         self.widgets.append(cat_filter)
+        
+        return cat_filter
     
 
     def add_numerical_filter(self, filter_mode='>=', title='Value', numeric_name='Altitude', step=50, height_policy='min', callback_policy='value_throttled', callback_class=None, **kwargs):
@@ -696,7 +675,29 @@ class st_visualizer:
 
         num_filter.on_change(callback_policy, callback_class(self, num_filter).callback)
         self.widgets.append(num_filter)
+
+        return num_filter
     
+
+    def prepare_grid(self, figures=None, sizing_mode=None, toolbar_location='above', ncols=None, plot_width=None, plot_height=None, toolbar_options=None, merge_tools=True):
+        """
+        TODO: Docstring
+        """
+        grid = None
+
+        try:
+            if figures is None:
+                if len(self.widgets) != 0:
+                    figures = [[column(*self.widgets)],[self.figure]]
+                else:
+                    figures = [[self.figure]]
+
+            grid = bokeh.layouts.gridplot(figures, sizing_mode=sizing_mode, toolbar_location=toolbar_location, ncols=ncols, plot_width=plot_width, plot_height=plot_height, toolbar_options=toolbar_options, merge_tools=merge_tools)
+        except TypeError as e:
+            print (f'{e}. You must either: \n \t* Pass \'figures\' as a nested list of figures and leave ncols = None; or\n \t* Pass \'figures\' as a list and a non-None value to \'ncols\'.')
+            
+        return grid
+
 
     def show_figures(self, figures=None, sizing_mode=None, toolbar_location='above', ncols=None, plot_width=None, plot_height=None, toolbar_options=None, merge_tools=True, notebook=True, doc=None, notebook_url='http://localhost:8888', **kwargs):
         """
@@ -730,19 +731,9 @@ class st_visualizer:
         **kwargs: Dict
             Other parameters related to the Canvas' output (in case the output is a Jupyter Notebook)
         """
-        grid = None
+        
+        grid = self.prepare_grid(figures, sizing_mode=sizing_mode, toolbar_location=toolbar_location, ncols=ncols, plot_width=plot_width, plot_height=plot_height, toolbar_options=toolbar_options, merge_tools=merge_tools)
 
-        try:
-            if figures is None:
-                if len(self.widgets) != 0:
-                    figures = [[column(*self.widgets)],[self.figure]]
-                else:
-                    figures = [[self.figure]]
-
-            grid = bokeh.layouts.gridplot(figures, sizing_mode=sizing_mode, toolbar_location=toolbar_location, ncols=ncols, plot_width=plot_width, plot_height=plot_height, toolbar_options=toolbar_options, merge_tools=merge_tools)
-        except TypeError as e:
-            print (f'{e}. You must either: \n \t* Pass \'figures\' as a nested list of figures and leave ncols = None; or\n \t* Pass \'figures\' as a list and a non-None value to \'ncols\'.')
-            
         def bokeh_app(doc):
             doc.add_root(grid)
 

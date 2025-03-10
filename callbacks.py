@@ -72,5 +72,5 @@ class BokehFilters:
 
 
     @abc.abstractmethod
-    def callback(self, attr, old, new):
+    def callback(self, *args):
         pass

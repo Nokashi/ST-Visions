@@ -2,7 +2,7 @@
 	geom_helper.py - v2020.05.07
 
 	Authors: Andreas Tritsarolis, Christos Doulkeridis, Yannis Theodoridis and Nikos Pelekis
-
+	
 	Notes:	
 		* The Methods ```getXYCoords```, ```getPolyCoords```, ```getLineCoords```, ```getPointCoords```, ```multiGeomHandler``` and ```getCoords``` were forked from: Advanced plotting with Bokeh, https://automating-gis-processes.github.io/2017/lessons/L5/advanced-bokeh.html, Last visited at: 09/03/2020.
 		* The Method ```quadrat_cut_geometry``` was forked from: https://github.com/gboeing/osmnx/blob/f5eb1fc4f18c1816987de7f0db8d35690dc65f41/osmnx/core.py#L589, Last visited at: 12/03/2020.
@@ -171,21 +171,21 @@ def create_linestring_from_points(gdf, column_handlers, **kwargs):
 	"""
 
 	tqdm.pandas(**kwargs)
-	
-	name = gdf.geometry.name
-	linestrings = gdf.groupby(column_handlers, group_keys=False).progress_apply(lambda l: shapely.geometry.LineString(l[name].values) if len(l) >= 2 else shapely.geometry.LineString(np.repeat(l[name].values, 2))).to_frame().reset_index()
+
+	geom = gdf.geometry.name
+	linestrings = gdf.groupby(column_handlers, group_keys=False).progress_apply(lambda l: shapely.geometry.LineString(l[geom].values) if len(l) >= 2 else shapely.geometry.LineString(np.repeat(l[geom].values, 2))).to_frame().reset_index()
 	linestrings.rename({0: 'geom'}, inplace=True, axis=1)
 	linestrings = gpd.GeoDataFrame(linestrings, crs=gdf.crs, geometry='geom')
+
 
 	return linestrings
 
 
-def getGeoDataFrame_v2(df, coordinate_columns=['lon', 'lat'], crs='epsg:4326'):
+def getGeoDataFrame_v2(df, coordinate_columns=['lon', 'lat'], crs={'init':'epsg:4326'}):
 	'''
 		Create a GeoDataFrame from a DataFrame in a much more generalized form.
 	'''
-	
-	df.loc[:, 'geom'] = np.nan
+	df = df.assign(geom=np.nan)
 	df.geom = df[coordinate_columns].apply(lambda x: shapely.geometry.Point(*x), axis=1)
 	
 	return gpd.GeoDataFrame(df, geometry='geom', crs=crs)
