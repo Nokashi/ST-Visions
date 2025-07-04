@@ -15,7 +15,7 @@ from tqdm import tqdm
 import bokeh
 import bokeh.io as bokeh_io
 import bokeh.plotting as bokeh_plt
-import bokeh.models as bokeh_mdl
+import bokeh.models as bokeh_mdl, WMTSTileSource
 import bokeh.palettes as palettes
 
 from bokeh.plotting import figure, reset_output, output_notebook, show
@@ -29,13 +29,18 @@ import callbacks
 
 
 # Defining Allowed Values (per use-case)
-ALLOWED_BASIC_GLYPH_TYPES = ["asterisk", "circle", "circle_cross", "circle_x", "cross", "dash", 'diamond', 'diamond_cross', 'hex', "inverted_triangle", 'square', 'square_cross', 'square_x', 'triangle']
+ALLOWED_BASIC_GLYPH_TYPES = ["asterisk", 'scatter', "circle", "circle_cross", "circle_x", "cross", "dash", 'diamond', 'diamond_cross', 'hex', "inverted_triangle", 'square', 'square_cross', 'square_x', 'triangle']
 ALLOWED_BASIC_POLYGON_TYPES = ['multi_polygons', 'patches']
 ALLOWED_BASIC_LINE_TYPES = ['hline_stack', 'line', 'multi_line', 'step', 'vline_stack']
 ALLOWED_FILTER_OPERATORS = {'==': operator.eq, '!=': operator.ne, '<': operator.lt, '<=': operator.le, '>': operator.gt, '>=': operator.ge, 'range': None}
 ALLOWED_CATEGORICAL_COLOR_PALLETES = ['Accent', 'Blues', 'BrBG', 'BuGn', 'Category10', 'Category20', 'Category20b', 'Category20c', 'Cividis', 'Colorblind', 'Dark2', 'GnBu', 'Greens', 'Greys', 'Inferno', 'Magma','OrRd', 'Oranges', 'PRGn', 'Paired', 'Pastel1', 'Pastel2', 'PiYG', 'Plasma', 'PuBu', 'PuBuGn', 'PuOr', 'PuRd', 'Purples', 'RdBu', 'RdGy', 'RdPu', 'RdYlBu', 'RdYlGn', 'Reds', 'Set1', 'Set2', 'Set3', 'Spectral', 'Turbo', 'Viridis', 'YlGn', 'YlGnBu', 'YlOrBr', 'YlOrRd']
 ALLOWED_NUMERICAL_COLOR_PALETTES = ['Blues256', 'Greens256', 'Greys256', 'Inferno256', 'Magma256', 'Plasma256', 'Viridis256', 'Cividis256', 'Turbo256', 'Oranges256', 'Purples256', 'Reds256']
 
+
+DEFAULT_MAP_TILE = WMTSTileSource(
+        url="https://tile.openstreetmap.org/{Z}/{X}/{Y}.png",
+        attribution="© OpenStreetMap contributors"
+    )
 
 class st_visualizer:
     def __init__(self, limit=30000, allow_complex_geometries=False, proj='epsg:3857'):
@@ -68,6 +73,15 @@ class st_visualizer:
         self.cmap = None
         self.__suffix = None
         self.aquire_canvas_data = None
+
+        self._add_default_map_tile()
+        
+    # TODO: Add functionality for a custom maptile (either providers or WMTST Objects)
+    def _add_default_map_tile(self):
+        try:
+            self.figure.add_tile(self.DEFAULT_MAP_TILE, level="underlay")
+        except Exception as e:
+            print(f"Map tile error: {e}")   
     
 
     def __set_data(self, data, columns):
@@ -353,7 +367,7 @@ class st_visualizer:
         return self.cmap
 
 
-    def add_glyph(self, glyph_type='circle', size=10, color='royalblue', sec_color='lightslategray', alpha=0.7, muted_alpha=0, **kwargs):
+    def add_glyph(self, glyph_type='scatter', size=10, color='royalblue', sec_color='lightslategray', alpha=0.7, muted_alpha=0, **kwargs):
         """
         Add a Glyph to the Canvas
             
