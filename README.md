@@ -1,10 +1,16 @@
-# ST_Visions Fork Test
-### A Python-based library for interactive spatio-temporal data visualization.
-
+# ST_Visions+ (Name Tentative)
+### A fork of ST_Visions focused on Modernization and Online Analytics Feature Extention.
 
 ## Overview
 ---
-ST_Visions (**S**patio-**T**emporal **Vis**ualizat**ions**) is a python library, able to interactively visualize spatio-temporal data in a quick-and-easy way. Based upon the functionality of [Bokeh](https://docs.bokeh.org/en/latest/index.html#), and further extending it, we are able to create powerful and cohesive visualizations (and/or online dashboards), for large or streaming spatio-temporal datasets.
+Built on the already existing [ST_Visions](https://github.com/DataStories-UniPi/ST-Visions) library (**S**patio-**T**emporal **Vis**ualizat**ions**) (Tritsarolis et al.), ST_Visions+ (Name Tentative) aims to Improve, Modernize and expand on the capabilities of the existing implementation, with respect to todays needs for clear Visual Analytics and Data Visualization. Work on the Library has two main pillars
+
+- Modernization of the library to match the cutting edge versions of all the dependecies needed
+- Further Implementation of important features for the modern Data Science space, such as Datastream visualization in real time, and additional Visual Analytics capabilities
+
+Work on this Fork is done as part of the following BSc Thesis 
+
+**ST_Visions+: Extending the ST_Visions Library for Real-Time Visual Analytics**
 
 
 ## Installation
