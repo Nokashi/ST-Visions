@@ -9,7 +9,7 @@ from st_visualizer import st_visualizer
 import bokeh.models as bokeh_models
 
 
-def plot_points_on_map(obj, tools=None, map_provider='CARTODBPOSITRON', glyph_type='circle', size=10, color='royalblue', alpha=0.7, fill_alpha=0.6, muted_alpha=0, legend_label=f'Object GPS Locations', sizing_mode='scale_width', **kwargs):
+def plot_points_on_map(obj, tools=None, marker='circle', size=10, color='royalblue', alpha=0.7, fill_alpha=0.6, muted_alpha=0, legend_label=f'Object GPS Locations', sizing_mode='scale_width', **kwargs):
     '''
         Visualize a Point Geometry Dataset on the map.
 
@@ -43,15 +43,14 @@ def plot_points_on_map(obj, tools=None, map_provider='CARTODBPOSITRON', glyph_ty
     basic_tools = "pan,box_zoom,wheel_zoom,save,reset" 
     extra_tools = f'{basic_tools},{",".join(tools)}' if tools is not None else basic_tools
         
-    obj.create_canvas(title=f'Prototype Plot', sizing_mode=sizing_mode, plot_height=540, tools=extra_tools, **kwargs)
-    obj.add_map_tile(map_provider)
+    obj.create_canvas(title=f'Prototype Plot', sizing_mode=sizing_mode, height=540, tools=extra_tools, **kwargs)
 
-    _ = obj.add_glyph(glyph_type=glyph_type, size=size, color=color, alpha=alpha, fill_alpha=fill_alpha, muted_alpha=muted_alpha, legend_label=legend_label)
+    _ = obj.add_glyph(marker=marker, size=size, color=color, alpha=alpha, fill_alpha=fill_alpha, muted_alpha=muted_alpha, legend_label=legend_label)
     obj.figure.toolbar.active_scroll = obj.figure.select_one(bokeh_models.WheelZoomTool)
 
 
 
-def plot_polygons_on_map(obj, tools=None, map_provider='CARTODBPOSITRON', polygon_type='patches', fill_color='royalblue', line_color='royalblue', alpha=1, fill_alpha=0.65, muted_alpha=0, legend_label='Polygon Locations', sizing_mode='scale_width', **kwargs):
+def plot_polygons_on_map(obj, tools=None, polygon_type='patches', fill_color='royalblue', line_color='royalblue', alpha=1, fill_alpha=0.65, muted_alpha=0, legend_label='Polygon Locations', sizing_mode='scale_width', **kwargs):
     '''
         Visualize a (Multi)Polygon Geometry Dataset on the map.
 
@@ -85,8 +84,7 @@ def plot_polygons_on_map(obj, tools=None, map_provider='CARTODBPOSITRON', polygo
     basic_tools = "pan,box_zoom,wheel_zoom,save,reset" 
     extra_tools = f'{basic_tools},{",".join(tools)}' if tools is not None else basic_tools
         
-    obj.create_canvas(title=f'Prototype Plot', sizing_mode=sizing_mode, plot_height=540, tools=extra_tools, **kwargs)
-    obj.add_map_tile(map_provider)
+    obj.create_canvas(title=f'Prototype Plot', sizing_mode=sizing_mode, height=540, tools=extra_tools, **kwargs)
 
     _ = obj.add_polygon(polygon_type=polygon_type, fill_color=fill_color, line_color=line_color, alpha=alpha, fill_alpha=fill_alpha, muted_alpha=muted_alpha, legend_label=legend_label)
     obj.figure.toolbar.active_scroll = obj.figure.select_one(bokeh_models.WheelZoomTool)
