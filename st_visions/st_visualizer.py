@@ -354,14 +354,14 @@ class st_visualizer:
         if palette not in ALLOWED_NUMERICAL_COLOR_PALETTES and not isinstance(palette, palettes.Palette.__origin__):
             raise ValueError(f'Invalid Palette. Allowed (pre-built) Palettes: {ALLOWED_NUMERICAL_COLOR_PALETTES}')
 
-        min_val, max_val = self.data[numeric_name].agg([np.min, np.max]) if val_range is None else val_range
+        min_val, max_val = self.data[numeric_name].agg(['min', 'max']) if val_range is None else val_range
         cmap = bokeh_mdl.LinearColorMapper(
             palette=getattr(palettes, palette) if palette in ALLOWED_NUMERICAL_COLOR_PALETTES else palette, 
             low=min_val, 
             high=max_val, 
             nan_color=nan_color
         )
-        
+    
         if colorbar:
             cbar = bokeh_mdl.ColorBar(orientation=cb_orientation, color_mapper=cmap, label_standoff=label_standoff, border_line_color=border_line_color, location=location, **kwargs) # Other Params: height=height, width=width
             self.figure.add_layout(cbar, cb_location)
@@ -398,7 +398,7 @@ class st_visualizer:
             The instance of the added glyph
         """
         if marker not in ALLOWED_BASIC_MARKERS:
-            raise ValueError(f'glyph_type must be one of the following: {ALLOWED_BASIC_MARKERS}')
+            raise ValueError(f'marker must be one of the following: {ALLOWED_BASIC_MARKERS}')
 
         coordinates = [f'{col}{self.__suffix}' for col in self.sp_columns]
 
