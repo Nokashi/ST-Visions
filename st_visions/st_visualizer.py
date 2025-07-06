@@ -40,10 +40,6 @@ ALLOWED_NUMERICAL_COLOR_PALETTES = ['Blues256', 'Greens256', 'Greys256', 'Infern
 
 class st_visualizer:
 
-    DEFAULT_MAP_TILE = bokeh_mdl.WMTSTileSource(
-        url="https://tile.openstreetmap.org/{Z}/{X}/{Y}.png",
-        attribution="© OpenStreetMap contributors"
-    )
 
     def __init__(self, limit=30000, allow_complex_geometries=False, proj='epsg:3857'):
         """
@@ -76,11 +72,16 @@ class st_visualizer:
         self.__suffix = None
         self.aquire_canvas_data = None
 
+        self.tilemap = bokeh_mdl.WMTSTileSource(
+        url="https://tile.openstreetmap.org/{Z}/{X}/{Y}.png",
+        attribution="© OpenStreetMap contributors"
+    )
+
         
     # TODO: Add functionality for a custom maptile (either providers or WMTST Objects)
-    def _add_default_map_tile(self):
+    def _add_default_map_tile(self, tileset):
         try:
-            self.figure.add_tile(self.DEFAULT_MAP_TILE, level="underlay")
+            self.figure.add_tile(tileset, level="underlay")
         except Exception as e:
             print(f"Map tile error: {e}")   
     
@@ -134,7 +135,7 @@ class st_visualizer:
             The canvas in which the data will be drawn to.
         """
         self.figure = figure
-        self._add_default_map_tile()
+        self._add_default_map_tile(self.tilemap)
         
 
 
@@ -527,7 +528,7 @@ class st_visualizer:
         self.figure.add_tools(bokeh_mdl.LassoSelectTool(**kwargs))
 
 
-    def add_temporal_filter(self, temporal_name='ts', temporal_unit='s', step_ms=3600000, start_date=None, end_date=None, title='Temporal Horizon', height_policy='min', callback_policy='value_throttled', callback_class=None, **kwargs):
+    def add_temporal_filter(self, temporal_name='ts', step_ms=3600000, start_date=None, end_date=None, title='Temporal Horizon', height_policy='min', callback_policy='value_throttled', callback_class=None, **kwargs):
         """
         Add a Temporal Filter to the Canvas
         
@@ -556,11 +557,13 @@ class st_visualizer:
 
         step = step_ms
 
-        start_date = pd.to_datetime(self.data[temporal_name].min(), unit=temporal_unit) if start_date is None else start_date
-        end_date   = pd.to_datetime(self.data[temporal_name].max(), unit=temporal_unit) if end_date is None else end_date
+        start_date = pd.to_datetime(self.data[temporal_name].min()) if start_date is None else start_date
+        end_date   = pd.to_datetime(self.data[temporal_name].max()) if end_date is None else end_date
 
-        temp_filter = bokeh_mdl.DateRangeSlider(start=start_date, end=end_date, value=(start_date, end_date), step=step, title=title, height_policy=height_policy, **kwargs)
+
+        temp_filter = bokeh_mdl.DateRangeSlider(start=start_date, end=end_date, value=(start_date, end_date), step=step, title=title, width=800, height_policy=height_policy, **kwargs)
         temp_filter.format = '%d %b %Y %H:%M:%S.%3N'
+        
 
 
         if callback_class is None:
@@ -578,7 +581,7 @@ class st_visualizer:
                     # self.widget.title = (f'{title}: {new_start}...{new_end}')
 
                     new_pts = self.get_data()
-                    new_pts = new_pts.loc[pd.to_datetime(new_pts[temporal_name], unit=temporal_unit).between(new_start, new_end)]
+                    new_pts = new_pts.loc[pd.to_datetime(new_pts[temporal_name]).between(new_start, new_end)]
 
                     self.callback_prepare_data(new_pts, self.widget.id==self.vsn_instance.aquire_canvas_data)
             callback_class = Callback
@@ -671,16 +674,16 @@ class st_visualizer:
         if filter_mode not in list(ALLOWED_FILTER_OPERATORS.keys()):
             raise ValueError(f'filter_mode must be one of the following: {list(ALLOWED_FILTER_OPERATORS.keys())}')
         
-        start, end = self.data[numeric_name].agg([np.min, np.max])
+        start, end = self.data[numeric_name].agg(['min', 'max'])
         
         if filter_mode != 'range':
             # value = start if value is None else value
             value = start
-            num_filter = bokeh_mdl.Slider(start=start, end=end, step=step, value=value, title=title, height_policy=height_policy, **kwargs)
+            num_filter = bokeh_mdl.Slider(start=start, end=end, step=step, value=value, width=800, title=title, height_policy=height_policy, **kwargs)
         else:
             # value = (start, end) if value is None else value
             value = (start, end)
-            num_filter = bokeh_mdl.RangeSlider(start=start, end=end, step=step, value=value, title=title, height_policy=height_policy, **kwargs)
+            num_filter = bokeh_mdl.RangeSlider(start=start, end=end, step=step, value=value, width=800, title=title, height_policy=height_policy, **kwargs)
 
         if callback_class is None:
             class Callback(callbacks.BokehFilters):
@@ -694,7 +697,7 @@ class st_visualizer:
                     new_pts = self.get_data()
 
                     if filter_mode == 'range':
-                        new_pts = new_pts.loc[new_pts[numeric_name].between(num_value[0], num_value[1], inclusive=True)]
+                        new_pts = new_pts.loc[new_pts[numeric_name].between(num_value[0], num_value[1], inclusive='both')]
                     else:
                         new_pts = new_pts.loc[ALLOWED_FILTER_OPERATORS[filter_mode](new_pts[numeric_name], num_value)]
             
