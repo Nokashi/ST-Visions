@@ -15,7 +15,7 @@ from tqdm import tqdm
 import bokeh
 import bokeh.io as bokeh_io
 import bokeh.plotting as bokeh_plt
-import bokeh.models as bokeh_mdl, WMTSTileSource
+import bokeh.models as bokeh_mdl
 import bokeh.palettes as palettes
 
 from bokeh.plotting import figure, reset_output, output_notebook, show
@@ -29,7 +29,7 @@ import callbacks
 
 
 # Defining Allowed Values (per use-case)
-ALLOWED_BASIC_GLYPH_TYPES = ["asterisk", 'scatter', "circle", "circle_cross", "circle_x", "cross", "dash", 'diamond', 'diamond_cross', 'hex', "inverted_triangle", 'square', 'square_cross', 'square_x', 'triangle']
+ALLOWED_BASIC_MARKERS = ["asterisk", "circle", "circle_cross", "circle_x", "cross", "dash", 'diamond', 'diamond_cross', 'hex', "inverted_triangle", 'square', 'square_cross', 'square_x', 'triangle']
 ALLOWED_BASIC_POLYGON_TYPES = ['multi_polygons', 'patches']
 ALLOWED_BASIC_LINE_TYPES = ['hline_stack', 'line', 'multi_line', 'step', 'vline_stack']
 ALLOWED_FILTER_OPERATORS = {'==': operator.eq, '!=': operator.ne, '<': operator.lt, '<=': operator.le, '>': operator.gt, '>=': operator.ge, 'range': None}
@@ -37,12 +37,14 @@ ALLOWED_CATEGORICAL_COLOR_PALLETES = ['Accent', 'Blues', 'BrBG', 'BuGn', 'Catego
 ALLOWED_NUMERICAL_COLOR_PALETTES = ['Blues256', 'Greens256', 'Greys256', 'Inferno256', 'Magma256', 'Plasma256', 'Viridis256', 'Cividis256', 'Turbo256', 'Oranges256', 'Purples256', 'Reds256']
 
 
-DEFAULT_MAP_TILE = WMTSTileSource(
+
+class st_visualizer:
+
+    DEFAULT_MAP_TILE = bokeh_mdl.WMTSTileSource(
         url="https://tile.openstreetmap.org/{Z}/{X}/{Y}.png",
         attribution="© OpenStreetMap contributors"
     )
 
-class st_visualizer:
     def __init__(self, limit=30000, allow_complex_geometries=False, proj='epsg:3857'):
         """
         Constructor for creating a VISIONS Instance.
@@ -74,7 +76,6 @@ class st_visualizer:
         self.__suffix = None
         self.aquire_canvas_data = None
 
-        self._add_default_map_tile()
         
     # TODO: Add functionality for a custom maptile (either providers or WMTST Objects)
     def _add_default_map_tile(self):
@@ -133,6 +134,8 @@ class st_visualizer:
             The canvas in which the data will be drawn to.
         """
         self.figure = figure
+        self._add_default_map_tile()
+        
 
 
     def set_source(self, source=None):
@@ -367,7 +370,7 @@ class st_visualizer:
         return self.cmap
 
 
-    def add_glyph(self, glyph_type='scatter', size=10, color='royalblue', sec_color='lightslategray', alpha=0.7, muted_alpha=0, **kwargs):
+    def add_glyph(self, marker='circle', size=10, color='royalblue', sec_color='lightslategray', alpha=0.7, muted_alpha=0, **kwargs):
         """
         Add a Glyph to the Canvas
             
@@ -393,15 +396,27 @@ class st_visualizer:
         renderer: Bokeh glyph instance
             The instance of the added glyph
         """
-        if glyph_type not in ALLOWED_BASIC_GLYPH_TYPES:
-            raise ValueError(f'glyph_type must be one of the following: {ALLOWED_BASIC_GLYPH_TYPES}')
+        if marker not in ALLOWED_BASIC_MARKERS:
+            raise ValueError(f'glyph_type must be one of the following: {ALLOWED_BASIC_MARKERS}')
 
         coordinates = [f'{col}{self.__suffix}' for col in self.sp_columns]
 
-        renderer = getattr(self.figure, glyph_type)(*coordinates, size=size, color=color, nonselection_fill_color=sec_color, alpha=alpha, muted_alpha=muted_alpha, source=self.source, **kwargs)
+        renderer = self.figure.scatter(
+            *coordinates,
+            size = size,
+            marker = marker,
+            color = color,
+            nonselection_fill_color=sec_color,
+            alpha = alpha,
+            muted_alpha = muted_alpha,
+            source = self.source,
+            **kwargs
+            )
+
         self.renderers.append(renderer)
 
         return renderer
+    
 
     
     def add_line(self, line_type='multi_line', line_color="royalblue", line_width=5, alpha=0.7, muted_alpha=0, **kwargs):
@@ -693,7 +708,7 @@ class st_visualizer:
         return num_filter
     
 
-    def prepare_grid(self, figures=None, sizing_mode=None, toolbar_location='above', ncols=None, plot_width=None, plot_height=None, toolbar_options=None, merge_tools=True):
+    def prepare_grid(self, figures=None, sizing_mode=None, toolbar_location='above', ncols=None, width=None, height=None, toolbar_options=None, merge_tools=True):
         """
         TODO: Docstring
         """
@@ -706,14 +721,14 @@ class st_visualizer:
                 else:
                     figures = [[self.figure]]
 
-            grid = bokeh.layouts.gridplot(figures, sizing_mode=sizing_mode, toolbar_location=toolbar_location, ncols=ncols, plot_width=plot_width, plot_height=plot_height, toolbar_options=toolbar_options, merge_tools=merge_tools)
+            grid = bokeh.layouts.gridplot(figures, sizing_mode=sizing_mode, toolbar_location=toolbar_location, ncols=ncols, width=width, height=height, toolbar_options=toolbar_options, merge_tools=merge_tools)
         except TypeError as e:
             print (f'{e}. You must either: \n \t* Pass \'figures\' as a nested list of figures and leave ncols = None; or\n \t* Pass \'figures\' as a list and a non-None value to \'ncols\'.')
             
         return grid
 
 
-    def show_figures(self, figures=None, sizing_mode=None, toolbar_location='above', ncols=None, plot_width=None, plot_height=None, toolbar_options=None, merge_tools=True, notebook=True, doc=None, notebook_url='http://localhost:8888', **kwargs):
+    def show_figures(self, figures=None, sizing_mode=None, toolbar_location='above', ncols=None, width=None, height=None, toolbar_options=None, merge_tools=True, notebook=True, doc=None, notebook_url='http://localhost:8888', **kwargs):
         """
         Method Description
             
@@ -746,7 +761,7 @@ class st_visualizer:
             Other parameters related to the Canvas' output (in case the output is a Jupyter Notebook)
         """
         
-        grid = self.prepare_grid(figures, sizing_mode=sizing_mode, toolbar_location=toolbar_location, ncols=ncols, plot_width=plot_width, plot_height=plot_height, toolbar_options=toolbar_options, merge_tools=merge_tools)
+        grid = self.prepare_grid(figures, sizing_mode=sizing_mode, toolbar_location=toolbar_location, ncols=ncols, width=width, height=height, toolbar_options=toolbar_options, merge_tools=merge_tools)
 
         def bokeh_app(doc):
             doc.add_root(grid)
