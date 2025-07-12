@@ -26,6 +26,7 @@ from bokeh.layouts import column, row
 sys.path.append(os.path.join(os.path.dirname(__file__)))
 import geom_helper
 import callbacks
+import providers
 
 
 # Defining Allowed Values (per use-case)
@@ -70,20 +71,7 @@ class st_visualizer:
 
         self.cmap = None
         self.__suffix = None
-        self.aquire_canvas_data = None
-
-        self.tilemap = bokeh_mdl.WMTSTileSource(
-        url="https://tile.openstreetmap.org/{Z}/{X}/{Y}.png",
-        attribution="© OpenStreetMap contributors"
-    )
-
-        
-    # TODO: Add functionality for a custom maptile (either providers or WMTST Objects)
-    def _add_default_map_tile(self, tileset):
-        try:
-            self.figure.add_tile(tileset, level="underlay")
-        except Exception as e:
-            print(f"Map tile error: {e}")   
+        self.aquire_canvas_data = None 
     
 
     def __set_data(self, data, columns):
@@ -135,7 +123,6 @@ class st_visualizer:
             The canvas in which the data will be drawn to.
         """
         self.figure = figure
-        self._add_default_map_tile(self.tilemap)
         
 
 
