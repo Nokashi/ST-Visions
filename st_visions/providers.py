@@ -27,7 +27,7 @@ DEFAULT_TILE_SOURCES = {
     }
 }
 
-def get_tile_source(tile_provider="OSM", **kwargs):
+def get_tile(tile_provider="OSM", **kwargs):
     """Get a tile source by name or return custom source directly.
 
     Parameters
@@ -84,4 +84,4 @@ def add_tile_to_canvas(obj, tile_provider='CARTODBPOSITRON', **kwargs):
     >>> add_tile_to_figure(fig, 'OSM') # built-in tile source
     >>> add_tile_to_figure(fig, custom_tile, alpha=0.7) # custom 
     """
-    obj.figure.add_tile(get_tile_source(tile_provider, **kwargs))
+    obj.figure.add_tile(get_tile(tile_provider, **kwargs))
