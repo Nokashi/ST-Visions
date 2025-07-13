@@ -27,14 +27,14 @@ DEFAULT_TILE_SOURCES = {
     }
 }
 
-def get_tile(tile_provider="OSM", **kwargs):
+def get_tile(tile_provider="CARTODBPOSITRON", **kwargs):
     """Get a tile source by name or return custom source directly.
 
     Parameters
     ----------
     provider : str or WMTSTileSource
         Either provider name string or existing tile source.
-        Default: "osm"
+        Default: "CARTODBPOSITRON"
     **kwargs : dict
         Additional arguments to pass to WMTSTileSource constructor.
 

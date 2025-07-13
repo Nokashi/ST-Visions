@@ -557,7 +557,9 @@ class st_visualizer:
             value=(start_date, end_date), 
             step=step, 
             format='%d %b %Y %H:%M:%S.%3N',
-            bar_color="#3b87f0", 
+            bar_color="royalblue", 
+            min_width= 500,
+            height_policy=height_policy
         )
 
 
