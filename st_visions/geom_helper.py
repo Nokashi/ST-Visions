@@ -206,7 +206,7 @@ def create_linestring_from_points(gdf, column_handlers, **kwargs):
 
 def getGeoDataFrame_v2(df, coordinate_columns=['lon', 'lat'], crs='EPSG:4326'):
     """
-    Create GeoDataFrame from DataFrame.
+    Create a GeoDataFrame from a DataFrame in a much more generalized form.
     """
     df = df.copy()
     df['geom'] = df[coordinate_columns].apply(lambda x: shapely.geometry.Point(*x), axis=1)

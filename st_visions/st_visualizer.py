@@ -274,7 +274,7 @@ class st_visualizer:
         
         if self.source is None:
             self.create_source(suffix)
-           
+    
 
     def add_categorical_colormap(self, palette, categorical_name, **kwargs):
         """
