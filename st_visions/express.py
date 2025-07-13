@@ -5,7 +5,6 @@
 '''    
 
 
-from st_visualizer import st_visualizer
 import bokeh.models as bokeh_models
 import providers
 

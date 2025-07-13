@@ -10,13 +10,15 @@
 
 
 import shapely
+import shapely.geometry
+import shapely.ops
 import numpy as np
-from tqdm import tqdm 
+from tqdm import tqdm
 import geopandas as gpd
 
 
 def concatPolyCoords(polyCoords):
-	"""
+    """
 	Function for concatenating the coordinates of complex geometries into a single unified list. There is a user guide section on Polygons With Holes As well as a nice example in the reference guide.
 	
 	```multi_polygon``` data is 4-level list:
@@ -28,89 +30,102 @@ def concatPolyCoords(polyCoords):
 	
 	From: https://stackoverflow.com/a/56462957
 	"""
-	return [[[p['exterior'], *p['holes']] for p in mp] for mp in polyCoords]
+    return [[[p['exterior'], *p['holes']] for p in mp] for mp in polyCoords]
 
 
 def getXYCoords(geometry, coord_index):
-	""" 
-	Returns either x or y coordinates from  geometry coordinate sequence. Used with LineString and Polygon geometries.
-	"""
-	return geometry.coords.xy[coord_index]
+    """
+    Returns either x or y coordinates from  geometry coordinate sequence. Used with LineString and Polygon geometries.
+    """
+    coords = np.asarray(geometry.coords)
+    return coords[:, coord_index]
 
 
 def getPolyCoords(geometry, coord_index, complex_geom):
-	""" 
-	Returns Coordinates of Polygon using the Exterior of the Polygon.
-	"""
-	ext = geometry.exterior
+    """
+    Returns Coordinates of Polygon using the Exterior of the Polygon.
+    """
+    exterior_coords = getXYCoords(geometry.exterior, coord_index)
 
-	exterior_coords = np.array(getXYCoords(ext, coord_index))
+    if complex_geom:
+        interior_coords = []
+        for interior in geometry.interiors:
+            interior_coords.append(getXYCoords(interior, coord_index))
 
-	if complex_geom:    
-		interior_coords = []
-
-		for interior in geometry.interiors:
-			interior_coords += [np.array(getXYCoords(interior, coord_index))]
-
-		return [{'exterior': np.array(exterior_coords), 'holes':np.array(interior_coords)}]
-	else:
-		return exterior_coords
+        return [{'exterior': exterior_coords, 'holes': interior_coords}]
+    else:
+        return exterior_coords
 
 
 def getLineCoords(geometry, coord_index):
-	""" 
-	Returns Coordinates of Linestring object.
-	"""
-	return getXYCoords(geometry, coord_index)
+    """
+    Returns Coordinates of Linestring object.
+    """
+    return getXYCoords(geometry, coord_index)
 
 
 def getPointCoords(geometry, coord_index):
-	""" 
-	Returns Coordinates of Point object.
-	"""
-	return getXYCoords(geometry, coord_index)
+    """
+    Returns Coordinates of Point object.
+    """
+    return [geometry.xy[coord_index][0]]
 
 
 def multiGeomHandler(multi_geometry, coord_index, geom_type, complex_geom=False):
-	"""
-	Function for handling multi-geometries. Can be MultiPoint, MultiLineString or MultiPolygon.
-	Returns a list of coordinates where all parts of Multi-geometries are merged into a single list.
-	Individual geometries are separated with np.nan which is how Bokeh wants them.
-	
-	Bokeh documentation regarding the Multi-geometry issues can be found here (it is an open issue) - https://github.com/bokeh/bokeh/issues/2321
-	"""
-	for i, part in enumerate(multi_geometry):
-		# On the first part of the Multi-geometry initialize the coord_array (np.array)
-		if i == 0:
-			if geom_type == "MultiPoint":
-				coord_arrays = np.append(getPointCoords(part, coord_index), np.nan)
-			elif geom_type == "MultiLineString":
-				coord_arrays = np.append(getLineCoords(part, coord_index), np.nan)
-			elif geom_type == "MultiPolygon":
-				if complex_geom:
-					coord_arrays = [getPolyCoords(part, coord_index, complex_geom)]
-				else:
-					coord_arrays = np.append(getPolyCoords(part, coord_index, complex_geom), np.nan)
-		else:
-			if geom_type == "MultiPoint":
-				coord_arrays = np.concatenate([coord_arrays, np.append(getPointCoords(part, coord_index), np.nan)])
-			elif geom_type == "MultiLineString":
-				coord_arrays = np.concatenate([coord_arrays, np.append(getLineCoords(part, coord_index), np.nan)])
-			elif geom_type == "MultiPolygon":
-				if complex_geom:
-					coord_arrays += [getPolyCoords(part, coord_index, complex_geom)]
-				else:
-					coord_arrays = np.concatenate([coord_arrays, np.append(getPolyCoords(part, coord_index, complex_geom), np.nan)])
+    """Handle multi-geometries and return coordinates formatted for Bokeh.
 
-	if geom_type == "MultiPolygon" and complex_geom:
-		coord_arrays = np.array(concatPolyCoords(coord_arrays)).reshape(1,-1)
+    Processes MultiPoint, MultiLineString, or MultiPolygon geometries by merging
+    all parts into coordinate arrays separated by np.nan values (Bokeh's format
+    requirement).
 
-	# Return the coordinates
-	return coord_arrays
+    Parameters
+    ----------
+    multi_geometry : shapely.MultiGeometry
+        Input multi-geometry (MultiPoint, MultiLineString, or MultiPolygon).
+    coord_index : int (accepted values: 0/1)
+        The index (x:0, y:1) of the coodinate dimensions to extract.
+    geom_type : str
+        Geometry type name ('MultiPoint', 'MultiLineString', 'MultiPolygon').
+    complex_geom : bool, optional (Default: False)
+        If True, returns exterior and interior coordinates for polygons.
+
+    Returns
+    -------
+    numpy.ndarray or list
+        - For simple geometries: 1D array with np.nan separators
+        - For complex MultiPolygons: List of dicts with 'exterior' and 'holes' keys
+
+    Notes
+    -----
+    - For MultiPolygon with complex_geom=True, returns a list of coordinate dicts
+      suitable for Bokeh's Patches marker.
+    - np.nan separators are required by Bokeh for multi-part geometries.
+    """
+    coord_arrays = []
+
+    for part in multi_geometry:
+        if geom_type == "MultiPoint":
+            coords = getPointCoords(part, coord_index)
+            coord_arrays.extend([*coords, np.nan])
+        elif geom_type == "MultiLineString":
+            coords = getLineCoords(part, coord_index)
+            coord_arrays.extend([*coords, np.nan])
+        elif geom_type == "MultiPolygon":
+            if complex_geom:
+                coord_arrays.append(getPolyCoords(part, coord_index, complex_geom))
+            else:
+                coords = getPolyCoords(part, coord_index, complex_geom)
+                coord_arrays.extend([*coords, np.nan])
+
+    if geom_type == "MultiPolygon" and complex_geom:
+        return concatPolyCoords(coord_arrays)
+    else:
+        return np.array(coord_arrays)
+
 
 
 def getCoords(geom, coord_index, complex_geom=False):
-	"""
+    """
 	Returns coordinates ('x' or 'y') of a geometry (Point, LineString or Polygon) as a list (if geometry is LineString or Polygon). Can handle also MultiGeometries.
 
 	Parameters
@@ -124,37 +139,34 @@ def getCoords(geom, coord_index, complex_geom=False):
 
 	Returns
 	-------
-		Either List (in case of Point, Line or Polygon geometries) or Nested List (in case of MultiPoint, MultiLineString or MultiPolygon geometries)
+		List (in case of Point, Line or Polygon geometries) or Nested List (in case of MultiPoint, MultiLineString or MultiPolygon geometries)
 	"""
-	# Check the geometry type
-	gtype = geom.geom_type
-
+    # Check the geometry type
+    gtype = geom.geom_type
+    
 	# "Normal" geometries
 	# -------------------
-	if gtype == "Point":
-		# print (f'Point: {getPointCoords(geom, coord_index)}')
-		return getPointCoords(geom, coord_index)[0]
-	elif gtype == "LineString":
-		# print (f'LineString: {getLineCoords(geom, coord_index)}')
-		return np.array(getLineCoords(geom, coord_index))
-	elif gtype == "Polygon":
-		# print (f'Polygon: {getPolyCoords(geom, coord_index)}')
-		poly_coords = getPolyCoords(geom, coord_index, complex_geom)
-
-		if complex_geom:
-			return np.array(concatPolyCoords([poly_coords])[0])
-		else:
-			return poly_coords
-
+    if gtype == "Point":
+        return getPointCoords(geom, coord_index)[0]
+    elif gtype == "LineString":
+        return np.array(getLineCoords(geom, coord_index))
+    elif gtype == "Polygon":
+        poly_coords = getPolyCoords(geom, coord_index, complex_geom)
+        if complex_geom:
+            return concatPolyCoords([poly_coords])[0]
+        else:
+            return poly_coords
+    
 	# Multi geometries
 	# ----------------
-	else:
-		return np.array( multiGeomHandler(geom, coord_index, gtype) )
+    else:
+        return multiGeomHandler(geom, coord_index, gtype, complex_geom)
+
 
 
 def create_linestring_from_points(gdf, column_handlers, **kwargs):
-	"""
-	Create LineStrings from Point Geometries.
+    """
+    Create LineStrings from Point Geometries.
 
 	Parameters
 	----------
@@ -168,32 +180,42 @@ def create_linestring_from_points(gdf, column_handlers, **kwargs):
 	Returns
 	-------
 	GeoPandas GeoDataFrame
-	"""
+    """
+    
+    tqdm.pandas(**kwargs)
+    geom_col = gdf.geometry.name
 
-	tqdm.pandas(**kwargs)
+    def make_linestring(group):
+        points = group[geom_col].values
+        if len(points) >= 2:
+            return shapely.line_merge(points)
+        else:
+            return shapely.geometry.LineString([points[0], points[0]])
 
-	geom = gdf.geometry.name
-	linestrings = gdf.groupby(column_handlers, group_keys=False).progress_apply(lambda l: shapely.geometry.LineString(l[geom].values) if len(l) >= 2 else shapely.geometry.LineString(np.repeat(l[geom].values, 2))).to_frame().reset_index()
-	linestrings.rename({0: 'geom'}, inplace=True, axis=1)
-	linestrings = gpd.GeoDataFrame(linestrings, crs=gdf.crs, geometry='geom')
+    linestrings = (
+        gdf.groupby(column_handlers, group_keys=False)
+        .progress_apply(lambda l: shapely.geometry.LineString([p.coords[0] for p in l[geom_col]]) if len(l) >= 2 else shapely.geometry.LineString([l[geom_col].iloc[0].coords[0]] * 2))
+        .to_frame()
+        .reset_index()
+    )
+
+    linestrings.rename(columns={0: 'geom'}, inplace=True)
+    linestrings = gpd.GeoDataFrame(linestrings, geometry='geom', crs=gdf.crs)
+    return linestrings
 
 
-	return linestrings
-
-
-def getGeoDataFrame_v2(df, coordinate_columns=['lon', 'lat'], crs={'init':'epsg:4326'}):
-	'''
-		Create a GeoDataFrame from a DataFrame in a much more generalized form.
-	'''
-	df = df.assign(geom=np.nan)
-	df.geom = df[coordinate_columns].apply(lambda x: shapely.geometry.Point(*x), axis=1)
-	
-	return gpd.GeoDataFrame(df, geometry='geom', crs=crs)
+def getGeoDataFrame_v2(df, coordinate_columns=['lon', 'lat'], crs='EPSG:4326'):
+    """
+    Create GeoDataFrame from DataFrame.
+    """
+    df = df.copy()
+    df['geom'] = df[coordinate_columns].apply(lambda x: shapely.geometry.Point(*x), axis=1)
+    return gpd.GeoDataFrame(df, geometry='geom', crs=crs)
 
 
 def classify_area_proximity(trajectories, spatial_areas, compensate=False, buffer_amount=1e-14, verbose=True):
-	"""
-	Classify Point Geometries according to their Spatial Proximity to one (or many) Spatial Area(s).
+    """
+    Classify Point Geometries according to their Spatial Proximity to one (or many) Spatial Area(s).
 
 	Parameters
 	----------
@@ -211,30 +233,30 @@ def classify_area_proximity(trajectories, spatial_areas, compensate=False, buffe
 	Returns
 	-------
 	GeoPandas GeoDataFrame
-	"""
+    """
+    trajectories['area_id'] = None
+    
+    print ('Creating Spatial Index...') if verbose else None
+    sindex = trajectories.sindex
 
-	# create the spatial index (r-tree) of the trajectories's data points
-	print ('Creating Spatial Index...') if verbose else None
-	sindex = trajectories.sindex
+    print ('Classifying Spatial Proximity...') if verbose else None
+    for area_id, poly in tqdm(spatial_areas.geometry.items(), disable=not verbose):
+        if compensate:
+            poly = poly.buffer(buffer_amount).buffer(0)
 
-	print ('Classifying Spatial Proximity...') if verbose else None
-	for area_id, poly in tqdm(spatial_areas.geometry.items(), disable=not verbose):
-		if compensate:
-			poly = poly.buffer(buffer_amount).buffer(0)
+        possible_matches_index = list(sindex.intersection(poly.bounds))
+        possible_matches = trajectories.iloc[possible_matches_index]
+        precise_matches = possible_matches[possible_matches.intersects(poly)]
 
-		possible_matches_index = list(sindex.intersection(poly.bounds))
-		possible_matches = trajectories.iloc[possible_matches_index]
-		precise_matches = possible_matches[possible_matches.intersects(poly)]
-		
-		if (len(precise_matches) != 0):
-			trajectories.loc[precise_matches.index, 'area_id'] = area_id
-		
-	return trajectories
+        if not precise_matches.empty:
+            trajectories.loc[precise_matches.index, 'area_id'] = area_id
+
+    return trajectories
 
 
 def quadrat_cut_geometry(geometry, quadrat_width, min_num=3, buffer_amount=1e-9):
-	"""
-	Split a Polygon or MultiPolygon up into sub-polygons of a specified size, using quadrats.
+    """
+    Split a Polygon or MultiPolygon up into sub-polygons of a specified size, using quadrats.
 		
 	Parameters
 	----------
@@ -250,25 +272,29 @@ def quadrat_cut_geometry(geometry, quadrat_width, min_num=3, buffer_amount=1e-9)
 	Returns
 	-------
 	shapely MultiPolygon
-	"""
-	
-	# create n evenly spaced points between the min and max x and y bounds
-	west, south, east, north = geometry.total_bounds
-	x_num = int(np.ceil((east-west) / quadrat_width) + 1)
-	y_num = int(np.ceil((north-south) / quadrat_width) + 1)
-	x_points = np.linspace(west, east, num=max(x_num, min_num))
-	y_points = np.linspace(south, north, num=max(y_num, min_num))
+    """
+    
+	# Create n evenly spaced points between the min and max x and y bounds
+    
+    west, south, east, north = geometry.bounds
+    x_num = int(np.ceil((east - west) / quadrat_width)) + 1
+    y_num = int(np.ceil((north - south) / quadrat_width)) + 1
+    x_points = np.linspace(west, east, max(x_num, min_num))
+    y_points = np.linspace(south, north, max(y_num, min_num))
 
-	# create a quadrat grid of lines at each of the evenly spaced points
-	vertical_lines = [shapely.geometry.LineString([(x, y_points[0]), (x, y_points[-1])]) for x in x_points]
-	horizont_lines = [shapely.geometry.LineString([(x_points[0], y), (x_points[-1], y)]) for y in y_points]
-	lines = vertical_lines + horizont_lines
+    # Create a quadrat grid of lines at each of the evenly spaced points
+    vertical_lines = [shapely.geometry.LineString([(x, y_points[0]), (x, y_points[-1])]) for x in x_points]
+    horizontal_lines = [shapely.geometry.LineString([(x_points[0], y), (x_points[-1], y)]) for y in y_points]
 
-	# buffer each line to distance of the quadrat width divided by 1 billion,
+    lines = vertical_lines + horizontal_lines
+
+    # buffer each line to distance of the quadrat width divided by 1 billion,
 	# take their union, then cut geometry into pieces by these quadrats
-	buffer_size = quadrat_width * buffer_amount
-	lines_buffered = [line.buffer(buffer_size) for line in lines]
-	quadrats = shapely.ops.unary_union(lines_buffered)
-	multipoly = geometry.difference(quadrats)
+    buffer_size = quadrat_width * buffer_amount
+    lines_buffered = [line.buffer(buffer_size) for line in lines]
+    quadrats = shapely.ops.unary_union(lines_buffered)
 
-	return multipoly
+    # Cut the geometry
+    result = geometry.difference(quadrats)
+
+    return result
