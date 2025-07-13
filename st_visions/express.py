@@ -4,7 +4,6 @@
 	Authors: Andreas Tritsarolis, Christos Doulkeridis, Yannis Theodoridis and Nikos Pelekis
 '''    
 
-
 import bokeh.models as bokeh_models
 import providers
 
@@ -19,20 +18,20 @@ def plot_points_on_map(obj, tools=None, tile_provider='CARTODBPOSITRON', marker=
             A VISIONS instance
         tools: List(str)
             A list of Bokeh tools (https://docs.bokeh.org/en/latest/docs/user_guide/tools.html)
-        map_provider: str (default: "CARTODBPOSITRON")
+        tile_provider: str (default: "CARTODBPOSITRON")
             The name of the map provider (Built-in values: CARTODBPOSITRON, STAMEN_TERRAIN, STAMEN_TONER, OSM). Accepts custom WMTSTileSource instances.
-        glyph_type: str (default: "circle")
-            The type of the glyph that will be used when rendering the data
-        size: int (default: 9)
-            The Glyphs' size
+        marker: str (default: "circle")
+            The type of the marker that will be used when rendering the data
+        size: int (default: 10)
+            The Markers' size
         color: str or bokeh.colors instance (default: ```'royalblue'```)
-            The Glyphs' primary color
+            The Markers' primary color
         alpha: float (values in [0,1] -- default: ```0.7```)
-            The Glyphs' overall alpha
+            The Markers' overall alpha
         fill_alpha: float (values in [0,1] -- default: ```0.7```)
-            The Glyphs' inner area alpha
+            The Markers' inner area alpha
         muted_alpha: float (values in [0,1] -- default: ```0```)
-            The Glyphs' alpha when disabled from the legend
+            The Markers' alpha when disabled from the legend
         legend_label: str (default: "Object GPS Locations")
             The label that will represent the point geometries on the legend
         sizing_mode: str (default: scale_width)
@@ -61,8 +60,8 @@ def plot_polygons_on_map(obj, tools=None, tile_provider='CARTODBPOSITRON', polyg
             A VISIONS instance
         tools: List(str)
             A list of Bokeh tools (https://docs.bokeh.org/en/latest/docs/user_guide/tools.html)
-        map_provider: str (default: ```CARTODBPOSITRON```)
-            The name of the map provider (allowed values: CARTODBPOSITRON, STAMEN_TERRAIN, STAMEN_TONER, STAMEN_TONER_BACKGROUND, STAMEN_TONER_LABELS)
+        tile_provider: str (default: ```CARTODBPOSITRON```)
+            The name of the map tile provider (allowed values: CARTODBPOSITRON, STAMEN_TERRAIN, STAMEN_TONER, STAMEN_TONER_BACKGROUND, STAMEN_TONER_LABELS)
         polygon_type: str (default: ```patches```)
             The type of polygon that will be used when rendering the data
         fill_color: ```str``` or ```bokeh.colors``` instance
@@ -103,8 +102,8 @@ def plot_lines_on_map(obj, tools=None, tile_provider='CARTODBPOSITRON', line_typ
             A VISIONS instance
         tools: List(str)
             A list of Bokeh tools (https://docs.bokeh.org/en/latest/docs/user_guide/tools.html)
-        map_provider: str (default: ```CARTODBPOSITRON```)
-            The name of the map provider (allowed values: CARTODBPOSITRON, STAMEN_TERRAIN, STAMEN_TONER, STAMEN_TONER_BACKGROUND, STAMEN_TONER_LABELS)
+        tile_provider: str (default: ```CARTODBPOSITRON```)
+            The name of the map tile provider (allowed values: CARTODBPOSITRON, STAMEN_TERRAIN, STAMEN_TONER, STAMEN_TONER_BACKGROUND, STAMEN_TONER_LABELS)
         line_type: str (default: ```multi_line```
             The type of the line that will be used when rendering the data
         line_color: ```str``` or ```bokeh.colors``` instance
