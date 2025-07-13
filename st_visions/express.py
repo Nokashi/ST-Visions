@@ -21,7 +21,7 @@ def plot_points_on_map(obj, tools=None, tile_provider= 'CARTODBPOSITRON', marker
         tools: List(str)
             A list of Bokeh tools (https://docs.bokeh.org/en/latest/docs/user_guide/tools.html)
         map_provider: str (default: "CARTODBPOSITRON")
-            The name of the map provider (allowed values: CARTODBPOSITRON, STAMEN_TERRAIN, STAMEN_TONER, STAMEN_TONER_BACKGROUND, STAMEN_TONER_LABELS)
+            The name of the map provider (Built-in values: CARTODBPOSITRON, STAMEN_TERRAIN, STAMEN_TONER, OSM). Accepts custom WMTSTileSource instances.
         glyph_type: str (default: "circle")
             The type of the glyph that will be used when rendering the data
         size: int (default: 9)
@@ -46,7 +46,8 @@ def plot_points_on_map(obj, tools=None, tile_provider= 'CARTODBPOSITRON', marker
         
     obj.create_canvas(title=f'Prototype Plot', sizing_mode=sizing_mode, height=540, tools=extra_tools, **kwargs)
     providers.add_tile_to_canvas(obj, tile_provider=tile_provider)
-    _ = obj.add_glyph(marker=marker, size=size, color=color, alpha=alpha, fill_alpha=fill_alpha, muted_alpha=muted_alpha, legend_label=legend_label)
+
+    _ = obj.add_marker(marker=marker, size=size, color=color, alpha=alpha, fill_alpha=fill_alpha, muted_alpha=muted_alpha, legend_label=legend_label)
     obj.figure.toolbar.active_scroll = obj.figure.select_one(bokeh_models.WheelZoomTool)
 
 

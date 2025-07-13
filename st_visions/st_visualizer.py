@@ -358,7 +358,7 @@ class st_visualizer:
         return self.cmap
 
 
-    def add_glyph(self, marker='circle', size=10, color='royalblue', sec_color='lightslategray', alpha=0.7, muted_alpha=0, **kwargs):
+    def add_marker(self, marker='circle', size=10, color='royalblue', sec_color='lightslategray', alpha=0.7, muted_alpha=0, **kwargs):
         """
         Add a Glyph to the Canvas
             
@@ -515,7 +515,7 @@ class st_visualizer:
         self.figure.add_tools(bokeh_mdl.LassoSelectTool(**kwargs))
 
 
-    def add_temporal_filter(self, temporal_name='ts', step_ms=3600000, start_date=None, end_date=None, title='Temporal Horizon', height_policy='min', callback_policy='value_throttled', callback_class=None, **kwargs):
+    def add_temporal_filter(self, temporal_name='ts', temporal_unit='s', step_ms=3600000, start_date=None, end_date=None, title='Temporal Horizon', height_policy='min', callback_policy='value_throttled', callback_class=None, **kwargs):
         """
         Add a Temporal Filter to the Canvas
         
@@ -544,13 +544,21 @@ class st_visualizer:
 
         step = step_ms
 
-        start_date = pd.to_datetime(self.data[temporal_name].min()) if start_date is None else start_date
-        end_date   = pd.to_datetime(self.data[temporal_name].max()) if end_date is None else end_date
-
-
-        temp_filter = bokeh_mdl.DateRangeSlider(start=start_date, end=end_date, value=(start_date, end_date), step=step, title=title, width=800, height_policy=height_policy, **kwargs)
-        temp_filter.format = '%d %b %Y %H:%M:%S.%3N'
+        start_date = (pd.to_datetime(self.data[temporal_name].min(), 
+                    unit=temporal_unit) if start_date is None else pd.to_datetime(start_date))
         
+        end_date = (pd.to_datetime(self.data[temporal_name].max(), 
+                unit=temporal_unit) if end_date is None else pd.to_datetime(end_date))
+
+        temp_filter = bokeh.models.DatetimeRangeSlider(
+            title=title,
+            start=start_date,
+            end=end_date,
+            value=(start_date, end_date), 
+            step=step, 
+            format='%d %b %Y %H:%M:%S.%3N',
+            bar_color="#3b87f0", 
+        )
 
 
         if callback_class is None:
@@ -568,7 +576,7 @@ class st_visualizer:
                     # self.widget.title = (f'{title}: {new_start}...{new_end}')
 
                     new_pts = self.get_data()
-                    new_pts = new_pts.loc[pd.to_datetime(new_pts[temporal_name]).between(new_start, new_end)]
+                    new_pts = new_pts.loc[pd.to_datetime(new_pts[temporal_name], unit=temporal_unit).between(new_start, new_end)]
 
                     self.callback_prepare_data(new_pts, self.widget.id==self.vsn_instance.aquire_canvas_data)
             callback_class = Callback
