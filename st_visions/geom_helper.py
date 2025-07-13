@@ -295,6 +295,6 @@ def quadrat_cut_geometry(geometry, quadrat_width, min_num=3, buffer_amount=1e-9)
     quadrats = shapely.ops.unary_union(lines_buffered)
 
     # Cut the geometry
-    result = geometry.difference(quadrats)
+    multipoly = geometry.difference(quadrats)
 
-    return result
+    return multipoly
