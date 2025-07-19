@@ -108,7 +108,7 @@ class st_visualizer:
             raise ValueError('"data" must be either a Pandas DataFrame or a GeoPandas GeoDataFrame')
 
         if type(data) != type(gpd.GeoDataFrame()):
-            data = geom_helper.getGeoDataFrame_v2(data, coordinate_columns=sp_columns, crs=crs)
+            data = geom_helper.create_geometry(data, coordinate_columns=sp_columns, crs=crs)
         
         self.__set_data(data, sp_columns)              
 
@@ -154,7 +154,7 @@ class st_visualizer:
             Other arguments related to parsing a CSV file (consult pandas.read_csv method)
         """
         data = pd.read_csv(filepath, **kwargs)
-        data = geom_helper.getGeoDataFrame_v2(data, coordinate_columns=sp_columns, crs=crs)
+        data = geom_helper.create_geometry(data, coordinate_columns=sp_columns, crs=crs)
        
         self.__set_data(data, sp_columns)
 
@@ -178,7 +178,7 @@ class st_visualizer:
             data = gpd.read_postgis(sql, con, crs=crs, **kwargs)
         else:
             data = pd.read_sql_query(sql, con, **kwargs)
-            data = geom_helper.getGeoDataFrame_v2(data, coordinate_columns=sp_columns, crs=crs)
+            data = geom_helper.create_geometry(data, coordinate_columns=sp_columns, crs=crs)
 
         self.__set_data(data, sp_columns)
 
@@ -239,7 +239,7 @@ class st_visualizer:
         self.__suffix = suffix
 
 
-    def create_canvas(self, title, x_range=None, y_range=None, suffix='_merc', **kwargs):        
+    def create_canvas(self, title, x_range=None, y_range=None, suffix='_merc', tile_kwargs={}, **kwargs):        
         """
         Create the instance's Canvas and CDS.
 
@@ -274,6 +274,10 @@ class st_visualizer:
         
         if self.source is None:
             self.create_source(suffix)
+
+        providers.add_tile_to_canvas(self, **tile_kwargs)
+
+        
     
 
     def add_categorical_colormap(self, palette, categorical_name, **kwargs):

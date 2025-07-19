@@ -32,7 +32,7 @@ def get_tile(tile_provider="CARTODBPOSITRON", **kwargs):
 
     Parameters
     ----------
-    provider : str or WMTSTileSource
+    tile_provider : str or WMTSTileSource
         Either provider name string or existing tile source.
         Default: "CARTODBPOSITRON"
     **kwargs : dict
@@ -66,7 +66,7 @@ def add_tile_to_canvas(obj, tile_provider='CARTODBPOSITRON', **kwargs):
     ----------
     obj: st_visualizer 
         A VISIONS instance
-    provider : str or WMTSTileSource
+    tile_provider : str or WMTSTileSource
         Either a provider name string (e.g., 'osm') from the allowed or
         an existing WMTSTileSource instance.
     **kwargs : dict, optional
