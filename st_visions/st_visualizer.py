@@ -10,7 +10,8 @@ import operator
 import numpy as np
 import pandas as pd
 import geopandas as gpd
-from tqdm import tqdm
+import itertools
+from itertools import islice
 
 import bokeh
 import bokeh.io as bokeh_io
@@ -239,7 +240,7 @@ class st_visualizer:
         self.__suffix = suffix
 
 
-    def create_canvas(self, title, x_range=None, y_range=None, suffix='_merc', tile_kwargs={}, **kwargs):        
+    def create_canvas(self, title, x_range=None, y_range=None, tile_provider='CARTODBPOSITRON', suffix='_merc', tile_kwargs={}, **kwargs):        
         """
         Create the instance's Canvas and CDS.
 
@@ -251,8 +252,14 @@ class st_visualizer:
             The Canvas' spatial horizon at the longitude dimension
         y_range: Numpy Array
             The Canvas' spatial horizon at the latitude dimension
+        tile_provider : str or WMTSTileSource
+            Either a provider name string (e.g., 'osm') from the allowed or
+            an existing WMTSTileSource instance.
         suffix: str (default: ```'_merc'```)
             A suffix for the column name of the extracted spatial coordinates
+        tile_kwargs: Dict
+            Additional Keyword arguments related to the tile provider of the instance's canvas (consult the WMTSTileSource Docs)
+            https://docs.bokeh.org/en/latest/docs/reference/models/tiles.html
         **kwargs: Dict
             Other arguments related to creating the instance's Canvas (consult bokeh.plotting.figure method)
         """
@@ -275,38 +282,46 @@ class st_visualizer:
         if self.source is None:
             self.create_source(suffix)
 
-        providers.add_tile_to_canvas(self, **tile_kwargs)
-
-        
-    
+        providers.add_tile_to_canvas(self, tile_provider=tile_provider, **tile_kwargs)
 
     def add_categorical_colormap(self, palette, categorical_name, **kwargs):
         """
-        Create a Categorical Colormap 
-            
+        Create a Categorical Colormap. Auto-repeats colors if the number of
+        categories exceeds the palette length.
+        
         Parameters
         ----------
         palette: str or Tuple 
-            The color palette of the colormap. It can either be one of Bokeh's default palettes or a Tuple of colors in hexadecimal format.
+            The color palette of the colormap. It can either be one of Bokeh's default palettes
+            or a Tuple of colors in hexadecimal format.
         categorical_name: str 
-            The column name of the loaded dataset that contains the categorical values
+            The column name of the loaded dataset that contains the categorical values.
         
         Returns
         -------
         cmap: Dict
-            The Categorical Colormap 
+            The Categorical Colormap.
         """
         if not (isinstance(palette, tuple) or palette in ALLOWED_CATEGORICAL_COLOR_PALLETES):
-            raise ValueError(f'Invalid Palette Name/Tuple. Allowed (pre-built) Palettes: {ALLOWED_CATEGORICAL_COLOR_PALLETES}')
+            raise ValueError(f'Invalid Palette Name/Tuple. Allowed Palettes: {ALLOWED_CATEGORICAL_COLOR_PALLETES}')
 
         categories = sorted(np.unique(self.source.data[categorical_name]).tolist())
-        palette = palette if isinstance(palette, tuple) else getattr(palettes, palette)[len(categories)]
+        num_categories = len(categories)
 
-        # print(categories)
-        cmap = bokeh_mdl.CategoricalColorMapper(palette=palette, factors=categories, **kwargs)
+        if isinstance(palette, tuple):
+            base_colors = palette
+        else:
+            available_sizes = getattr(palettes, palette).keys()
+            max_size = max(available_sizes)
+            base_colors = getattr(palettes, palette)[max_size]
+            
+        # General umbrella fallback zip method that runs even if the colors are enough.
+        full_palette = list(islice(itertools.cycle(base_colors), num_categories))
 
-        # self.cmap = {'type':'add_categorical_colormap', 'cmap':{'field': categorical_name, 'transform': cmap}}
+        # Create the CategoricalColorMapper instance
+        cmap = bokeh_mdl.CategoricalColorMapper(palette=full_palette, factors=categories, **kwargs)
         self.cmap = {'field': categorical_name, 'transform': cmap}
+
         return self.cmap
 
     
