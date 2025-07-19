@@ -223,39 +223,50 @@ def classify_area_proximity(trajectories, spatial_areas, compensate=False, buffe
     """
     Classify Point Geometries according to their Spatial Proximity to one (or many) Spatial Area(s).
 
-	Parameters
-	----------
-	trajectories: GeoPandas GeoDataFrame
-		Contains information about the Point Geometries
-	spatial_areas: GeoPandas GeoDataFrame
-		Contains information about the Spatial Areas
-	compensate: Boolean (default: False)
-		Buffer each spatial area by ```buffer_ammount```
-	buffer_ammount: Numeric (default: 1e-14)
-		Buffer ammount for ```spatial_areas``` (if ```compensate = True```)
-	verbose: Boolean (default: True)
-		Enable/Disable Verbosity
+    Parameters
+    ----------
+    trajectories: GeoPandas GeoDataFrame
+        Contains information about the Point Geometries.
+    spatial_areas: GeoPandas GeoDataFrame
+        Contains information about the Spatial Areas (Polygons).
+    compensate: bool, default False
+        Buffer each spatial area by `buffer_amount`.
+    buffer_amount: float, default 1e-14
+        Buffer amount for `spatial_areas` (if `compensate=True`).
+    verbose: bool, default True
+        Enable or disable verbosity.
 
-	Returns
-	-------
-	GeoPandas GeoDataFrame
+    Returns
+    -------
+    GeoPandas GeoDataFrame
+        Updated `trajectories` with an added `area_id` column.
     """
-    trajectories['area_id'] = None  
-    
-    print ('Creating Spatial Index...') if verbose else None
+    trajectories = trajectories.copy()
+    trajectories['area_id'] = None
+
+    if verbose:
+        print("Creating spatial index for points...")
+    # Create spatial index on the points
     sindex = trajectories.sindex
+    if verbose:
+        print("Classifying spatial proximity...")
 
-    print ('Classifying Spatial Proximity...') if verbose else None
-    for area_id, poly in tqdm(spatial_areas.geometry.items(), disable=not verbose):
+    for area_id, polygon in tqdm(spatial_areas.geometry.items(), disable=not verbose):
         if compensate:
-            poly = poly.buffer(buffer_amount).buffer(0)
+            polygon = polygon.buffer(buffer_amount).buffer(0)
+        possible_matches = sindex.query(polygon, predicate='intersects')
+        
+        if possible_matches.size == 0:
+            continue  # No possible matches
 
-        possible_matches_index = list(sindex.intersection(poly.bounds))
-        possible_matches = trajectories.iloc[possible_matches_index]
-        precise_matches = possible_matches[possible_matches.intersects(poly)]
+        # Filter precise matches
+        matched = trajectories.loc[possible_matches]
+        intersects = matched.geometry.intersects(polygon)
 
-        if not precise_matches.empty:
-            trajectories.loc[precise_matches.index, 'area_id'] = area_id
+        matched_indices = matched[intersects].index
+
+        # Assign area_id to matching points
+        trajectories.loc[matched_indices, 'area_id'] = area_id
 
     return trajectories
 
