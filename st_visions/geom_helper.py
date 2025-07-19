@@ -204,13 +204,19 @@ def create_linestring_from_points(gdf, column_handlers, **kwargs):
     return linestrings
 
 
-def getGeoDataFrame_v2(df, coordinate_columns=['lon', 'lat'], crs='EPSG:4326'):
+def create_geometry(df, coordinate_columns=['lon', 'lat'], crs=4326):
     """
     Create a GeoDataFrame from a DataFrame in a much more generalized form.
     """
-    df = df.copy()
-    df['geom'] = df[coordinate_columns].apply(lambda x: shapely.geometry.Point(*x), axis=1)
-    return gpd.GeoDataFrame(df, geometry='geom', crs=crs)
+    return gpd.GeoDataFrame(
+        df,
+        geometry = gpd.points_from_xy(
+            *[
+                df[col] for col in coordinate_columns
+            ]
+        ),
+        crs=crs
+    )
 
 
 def classify_area_proximity(trajectories, spatial_areas, compensate=False, buffer_amount=1e-14, verbose=True):
@@ -234,7 +240,7 @@ def classify_area_proximity(trajectories, spatial_areas, compensate=False, buffe
 	-------
 	GeoPandas GeoDataFrame
     """
-    trajectories['area_id'] = None
+    trajectories['area_id'] = None  
     
     print ('Creating Spatial Index...') if verbose else None
     sindex = trajectories.sindex
