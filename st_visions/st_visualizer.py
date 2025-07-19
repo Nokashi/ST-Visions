@@ -10,6 +10,7 @@ import operator
 import numpy as np
 import pandas as pd
 import geopandas as gpd
+from loguru import logger
 import itertools
 from itertools import islice
 
@@ -106,7 +107,9 @@ class st_visualizer:
             The CRS of the Dataset's spatial coordinates
         """
         if type(data) not in [type(gpd.GeoDataFrame()), type(pd.DataFrame())]:
-            raise ValueError('"data" must be either a Pandas DataFrame or a GeoPandas GeoDataFrame')
+            logger.error(f'"data" must be either a Pandas DataFrame or a GeoPandas GeoDataFrame, but got type: { type(data).__name__}')
+            # raise ValueError('"data" must be either a Pandas DataFrame or a GeoPandas GeoDataFrame')
+            sys.exit(1)
 
         if type(data) != type(gpd.GeoDataFrame()):
             data = geom_helper.create_geometry(data, coordinate_columns=sp_columns, crs=crs)
@@ -209,7 +212,9 @@ class st_visualizer:
             suffix = self.__suffix
         
         if (suffix is None or data is None):
-            raise ValueError('You must either set a Dataset and/or set a Column suffix for extracted geometry coordinates.')
+            logger.error('You must either set a Dataset and/or set a Column suffix for extracted geometry coordinates.')
+            sys.exit(1)
+            # raise ValueError('You must either set a Dataset and/or set a Column suffix for extracted geometry coordinates.')
         
         for dim, coord_name in enumerate(self.sp_columns):
             data.loc[:, f'{coord_name}{suffix}'] = data.geometry.apply(lambda l: geom_helper.getCoords(l, dim, self.allow_complex_geometries))
@@ -228,7 +233,9 @@ class st_visualizer:
             A suffix for the column name of the extracted spatial coordinates
         """
         if self.data is None:
-            raise ValueError('You must set a DataFrame first.')
+            logger.error('You must set a DataFrame first')
+            sys.exit(1)
+            # raise ValueError('You must set a DataFrame first.')
 
         # data_merc = self.data.iloc[:self.limit if limit is None else limit].copy()
         data_merc = self.prepare_data(suffix=suffix)
@@ -264,7 +271,9 @@ class st_visualizer:
             Other arguments related to creating the instance's Canvas (consult bokeh.plotting.figure method)
         """
         if self.data is None:
-            raise ValueError('You must set a DataFrame first.')
+            logger.error('You must set a DataFrame first')
+            sys.exit(1)
+            # raise ValueError('You must set a DataFrame first.')
         
         if self.limit < len(self.data):
             title = f'{title} - Showing {self.limit} out of {len(self.data)} records'
@@ -303,7 +312,9 @@ class st_visualizer:
             The Categorical Colormap.
         """
         if not (isinstance(palette, tuple) or palette in ALLOWED_CATEGORICAL_COLOR_PALLETES):
-            raise ValueError(f'Invalid Palette Name/Tuple. Allowed Palettes: {ALLOWED_CATEGORICAL_COLOR_PALLETES}')
+            logger.error(f'❌ Invalid palette: "{palette}". Must be a tuple or one of the allowed palettes: {ALLOWED_CATEGORICAL_COLOR_PALLETES}')
+            sys.exit(1)
+            # raise ValueError(f'Invalid Palette Name/Tuple. Allowed Palettes: {ALLOWED_CATEGORICAL_COLOR_PALLETES}')
 
         categories = sorted(np.unique(self.source.data[categorical_name]).tolist())
         num_categories = len(categories)
@@ -357,8 +368,10 @@ class st_visualizer:
         cmap: Dict
             The Numerical Colormap 
         """
-        if palette not in ALLOWED_NUMERICAL_COLOR_PALETTES and not isinstance(palette, palettes.Palette.__origin__):
-            raise ValueError(f'Invalid Palette. Allowed (pre-built) Palettes: {ALLOWED_NUMERICAL_COLOR_PALETTES}')
+        if not(palette in ALLOWED_NUMERICAL_COLOR_PALETTES or isinstance(palette, palettes.Palette.__origin__)):
+            logger.error(f'❌ Invalid palette: "{palette}". Must be a tuple or one of the allowed palettes: {ALLOWED_NUMERICAL_COLOR_PALETTES}')
+            sys.exit(1)            
+            # raise ValueError(f'Invalid Palette. Allowed (pre-built) Palettes: {ALLOWED_NUMERICAL_COLOR_PALETTES}')
 
         min_val, max_val = self.data[numeric_name].agg(['min', 'max']) if val_range is None else val_range
         cmap = bokeh_mdl.LinearColorMapper(
@@ -404,7 +417,9 @@ class st_visualizer:
             The instance of the added glyph
         """
         if marker not in ALLOWED_BASIC_MARKERS:
-            raise ValueError(f'marker must be one of the following: {ALLOWED_BASIC_MARKERS}')
+            logger.error(f'❌ Invalid marker: "{marker}". Allowed markers are: {ALLOWED_BASIC_MARKERS}')
+            sys.exit(1)
+            # raise ValueError(f'marker must be one of the following: {ALLOWED_BASIC_MARKERS}')
 
         coordinates = [f'{col}{self.__suffix}' for col in self.sp_columns]
 
@@ -451,7 +466,9 @@ class st_visualizer:
             The instance of the added PolyLine
         """
         if line_type not in ALLOWED_BASIC_LINE_TYPES:
-            raise ValueError(f'line_type must be one of the following: {ALLOWED_BASIC_LINE_TYPES}')
+            logger.error(f'❌ Invalid line_type: "{line_type}". Allowed types are: {ALLOWED_BASIC_LINE_TYPES}')
+            sys.exit(1)
+            # raise ValueError(f'line_type must be one of the following: {ALLOWED_BASIC_LINE_TYPES}')
 
         coordinates = [f'{col}{self.__suffix}' for col in self.sp_columns]
 
@@ -497,7 +514,9 @@ class st_visualizer:
             The instance of the added polygon
         """
         if polygon_type not in ALLOWED_BASIC_POLYGON_TYPES:
-            raise ValueError(f'polygon_type must be one of the following: {ALLOWED_BASIC_POLYGON_TYPES}')
+            logger.error(f'❌ Invalid line_type: "{polygon_type}". Allowed types are: {ALLOWED_BASIC_POLYGON_TYPES}')
+            sys.exit(1)
+            # raise ValueError(f'line_type must be one of the following: {ALLOWED_BASIC_POLYGON_TYPES}')
 
         coordinates = [f'{col}{self.__suffix}' for col in self.sp_columns]
 
@@ -688,7 +707,9 @@ class st_visualizer:
         kwargs.pop('value', None)
         
         if filter_mode not in list(ALLOWED_FILTER_OPERATORS.keys()):
-            raise ValueError(f'filter_mode must be one of the following: {list(ALLOWED_FILTER_OPERATORS.keys())}')
+            logger.error(f' ❌ filter_mode must be one of the following: {list(ALLOWED_FILTER_OPERATORS.keys())}')
+            sys.exit(1)
+            # raise ValueError(f' ❌ filter_mode must be one of the following: {list(ALLOWED_FILTER_OPERATORS.keys())}')
         
         start, end = self.data[numeric_name].agg(['min', 'max'])
         
@@ -729,7 +750,36 @@ class st_visualizer:
 
     def prepare_grid(self, figures=None, sizing_mode=None, toolbar_location='above', ncols=None, width=None, height=None, toolbar_options=None, merge_tools=True):
         """
-        TODO: Docstring
+        Prepare a Bokeh grid layout for figures and widgets.
+
+        Parameters
+        ----------
+        figures : list or list of lists, optional
+            A list of Bokeh figure objects or a nested list of figures to arrange in a grid.
+            If None, the grid will be composed of the instance's widgets and figure.
+        sizing_mode : str or None, optional
+            The sizing mode for the layout (e.g., 'fixed', 'stretch_both', 'scale_width', etc.).
+            Passed directly to Bokeh's `gridplot`.
+        toolbar_location : str or None, optional, default: 'above'
+            Location of the toolbar. Options include 'above', 'below', 'left', 'right', or None.
+        ncols : int or None, optional
+            Number of columns in the grid. If figures is a nested list, ncols should be None.
+            If figures is a flat list, ncols must be specified.
+        width : int or None, optional
+            Width of each subplot in the grid.
+        height : int or None, optional
+            Height of each subplot in the grid.
+        toolbar_options : dict or None, optional
+            Additional options for the toolbar passed to Bokeh's `gridplot`.
+        merge_tools : bool, optional, default: True
+            Whether to merge tools from all figures into a single toolbar.
+
+        Returns
+        -------
+        bokeh.layouts.GridBox or None
+            A Bokeh grid layout object containing the arranged figures and widgets,
+            or None if the grid could not be created due to an error.
+    
         """
         grid = None
 
@@ -742,14 +792,15 @@ class st_visualizer:
 
             grid = bokeh.layouts.gridplot(figures, sizing_mode=sizing_mode, toolbar_location=toolbar_location, ncols=ncols, width=width, height=height, toolbar_options=toolbar_options, merge_tools=merge_tools)
         except TypeError as e:
-            print (f'{e}. You must either: \n \t* Pass \'figures\' as a nested list of figures and leave ncols = None; or\n \t* Pass \'figures\' as a list and a non-None value to \'ncols\'.')
+            logger.error(f"{e}.\nYou must either:\n\t* Pass 'figures' as a nested list of figures and leave ncols = None;\n\t* Pass 'figures' as a list and a non-None value to 'ncols'.")
+            # print (f'{e}. You must either: \n \t* Pass \'figures\' as a nested list of figures and leave ncols = None; or\n \t* Pass \'figures\' as a list and a non-None value to \'ncols\'.')
             
         return grid
 
 
     def show_figures(self, figures=None, sizing_mode=None, toolbar_location='above', ncols=None, width=None, height=None, toolbar_options=None, merge_tools=True, notebook=True, doc=None, notebook_url='http://localhost:8888', **kwargs):
         """
-        Method Description
+        Render a Bokeh grid layout either in a Jupyter notebook or a Bokeh server.
             
         Parameters
         ----------

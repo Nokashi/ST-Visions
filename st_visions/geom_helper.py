@@ -15,6 +15,7 @@ import shapely.ops
 import numpy as np
 from tqdm import tqdm
 import geopandas as gpd
+from loguru import logger
 
 
 def concatPolyCoords(polyCoords):
@@ -245,11 +246,11 @@ def classify_area_proximity(trajectories, spatial_areas, compensate=False, buffe
     trajectories['area_id'] = None
 
     if verbose:
-        print("Creating spatial index for points...")
+        logger.info(f'Creating spatial index for points...')
     # Create spatial index on the points
     sindex = trajectories.sindex
     if verbose:
-        print("Classifying spatial proximity...")
+        logger.info(f"Classifying spatial proximity...")
 
     for area_id, polygon in tqdm(spatial_areas.geometry.items(), disable=not verbose):
         if compensate:

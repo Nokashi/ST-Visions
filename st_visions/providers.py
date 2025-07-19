@@ -1,4 +1,6 @@
 from bokeh.models import WMTSTileSource
+from loguru import logger
+import sys
 
 """
 providers.py - v2025.07.12
@@ -54,7 +56,9 @@ def get_tile(tile_provider="CARTODBPOSITRON", **kwargs):
     #string failsafe
     tile_provider = tile_provider.upper()
     if tile_provider not in DEFAULT_TILE_SOURCES:
-        raise ValueError(f"Provider must be one of the following: {list(DEFAULT_TILE_SOURCES.keys())}")
+        logger.error(f"Provider must be one of the following: {list(DEFAULT_TILE_SOURCES.keys())}")
+        sys.exit(1)
+        # raise ValueError(f"Provider must be one of the following: {list(DEFAULT_TILE_SOURCES.keys())}")
     
     return WMTSTileSource(**{**DEFAULT_TILE_SOURCES[tile_provider], **kwargs})
 
