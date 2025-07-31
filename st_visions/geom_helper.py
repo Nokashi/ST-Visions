@@ -186,16 +186,13 @@ def create_linestring_from_points(gdf, column_handlers, **kwargs):
     tqdm.pandas(**kwargs)
     geom_col = gdf.geometry.name
 
-    def make_linestring(group):
-        points = group[geom_col].values
-        if len(points) >= 2:
-            return shapely.line_merge(points)
-        else:
-            return shapely.geometry.LineString([points[0], points[0]])
-
     linestrings = (
-        gdf.groupby(column_handlers, group_keys=False)
-        .progress_apply(lambda l: shapely.geometry.LineString([p.coords[0] for p in l[geom_col]]) if len(l) >= 2 else shapely.geometry.LineString([l[geom_col].iloc[0].coords[0]] * 2))
+        gdf.groupby(column_handlers, group_keys=False, include_groups=False)
+        .progress_apply(
+            lambda l: shapely.geometry.LineString([p.coords[0] for p in l[geom_col]])
+            if len(l) >= 2
+            else shapely.geometry.LineString([l[geom_col].iloc[0].coords[0]] * 2)
+        )
         .to_frame()
         .reset_index()
     )
@@ -247,6 +244,7 @@ def classify_area_proximity(trajectories, spatial_areas, compensate=False, buffe
 
     if verbose:
         logger.info(f'Creating spatial index for points...')
+    
     # Create spatial index on the points
     sindex = trajectories.sindex
     if verbose:
@@ -258,7 +256,7 @@ def classify_area_proximity(trajectories, spatial_areas, compensate=False, buffe
         possible_matches = sindex.query(polygon, predicate='intersects')
         
         if possible_matches.size == 0:
-            continue  # No possible matches
+            continue  
 
         # Filter precise matches
         matched = trajectories.loc[possible_matches]
@@ -266,7 +264,6 @@ def classify_area_proximity(trajectories, spatial_areas, compensate=False, buffe
 
         matched_indices = matched[intersects].index
 
-        # Assign area_id to matching points
         trajectories.loc[matched_indices, 'area_id'] = area_id
 
     return trajectories

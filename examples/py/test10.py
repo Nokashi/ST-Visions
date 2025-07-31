@@ -1,26 +1,20 @@
-import os, sys
+import sys, os
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 import pandas as pd
 import geopandas as gpd
 import shapely
-import datetime
 import numpy as np
-from tqdm import tqdm
-from datetime import datetime
-
-import bokeh as bkh
 import bokeh.models as bkhm
-import bokeh.palettes as bokeh_palettes
 import bokeh.colors as bokeh_colors
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-from st_visualizer import st_visualizer
-import express as viz_express
-import geom_helper as viz_helper
-import callbacks
-
+from st_visions.st_visualizer import st_visualizer
+import st_visions.express as viz_express
+import st_visions.geom_helper as viz_helper
+import st_visions.providers as viz_providers
+import st_visions.callbacks as viz_callbacks
 
 pd.set_option('display.expand_frame_repr', False)
-
 pd.set_option('display.max_rows', 10)
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', None)
@@ -29,44 +23,57 @@ pd.set_option('display.max_colwidth', None)
 
 
 ### Loading GeoLife Dataset
-gdf = pd.read_csv('./data/csv/geolife_trips_cleaned_v2_china_subset.csv', nrows=50000)
-gdf = viz_helper.getGeoDataFrame_v2(gdf, crs='epsg:4326')
+gdf = pd.read_csv(r'..\..\data\unipi_ais_dynamic_2017\unipi_ais_dynamic_dec2017.csv')
+gdf = viz_helper.create_geometry(gdf, crs=4326)
 
 ### Creating Choropleth (Grid) Geometry
-bbox = np.array(gdf.total_bounds)
+# get bounding box as (minx, miny, maxx, maxy)
+bbox = gdf.total_bounds
+west, south, east, north = bbox
 
-p1 = shapely.geometry.Point(bbox[0], bbox[3])
-p2 = shapely.geometry.Point(bbox[2], bbox[3])
-p3 = shapely.geometry.Point(bbox[2], bbox[1])
-p4 = shapely.geometry.Point(bbox[0], bbox[1])
+polygon_corners = [
+    (west, north),
+    (east, north),
+    (east, south),
+    (west, south)
+]
 
-np1 = (p1.coords.xy[0][0], p1.coords.xy[1][0])
-np2 = (p2.coords.xy[0][0], p2.coords.xy[1][0])
-np3 = (p3.coords.xy[0][0], p3.coords.xy[1][0])
-np4 = (p4.coords.xy[0][0], p4.coords.xy[1][0])
+bbox_polygon = shapely.geometry.Polygon(polygon_corners)
+cut_result = viz_helper.quadrat_cut_geometry(bbox_polygon, 0.7)
 
-spatial_coverage = gpd.GeoDataFrame(gpd.GeoSeries(shapely.geometry.Polygon([np1, np2, np3, np4])), columns=['geom'], geometry='geom',  crs='epsg:4326')
-spatial_coverage_cut = viz_helper.quadrat_cut_geometry(spatial_coverage, 0.7)
-spatial_coverage_cut = gpd.GeoDataFrame(np.array(list(spatial_coverage_cut)).reshape(-1,1), geometry=0, crs='epsg:4326')
+spatial_coverage_cut = gpd.GeoDataFrame(
+    geometry=list(cut_result.geoms) if hasattr(cut_result, 'geoms') else [cut_result],
+    crs=4326
+)
 
 
-### Classifying Area Proximity (i.e., Populate the Choropleth Map)
-cnt = viz_helper.classify_area_proximity(gdf.copy(), spatial_coverage_cut, compensate=True, verbose=True).area_id.value_counts()
+#Classify points into spatial areas
+classified_gdf = viz_helper.classify_area_proximity(gdf.copy(), spatial_coverage_cut, compensate=True, verbose=True)
 
+# Get how many points are in each area
+cnt = classified_gdf['area_id'].value_counts()
+
+# Assign counts to spatial_coverage_cut GeoDataFram. Note: spatial_coverage_cut index should match the area_id values
+spatial_coverage_cut = spatial_coverage_cut.copy() 
+spatial_coverage_cut['count'] = 0 
 spatial_coverage_cut.loc[cnt.index, 'count'] = cnt.values
-spatial_coverage_cut.rename({0:'geom'}, axis=1, inplace=True)
-spatial_coverage_cut.set_geometry('geom', inplace=True)
+
+if spatial_coverage_cut.geometry.name != 'geometry':
+    spatial_coverage_cut = spatial_coverage_cut.rename_geometry('geometry')
 
 
 
 st_viz = st_visualizer(limit=len(spatial_coverage_cut))
-st_viz.set_data(spatial_coverage_cut)
+st_viz.set_data(spatial_coverage_cut.dropna())
 
-st_viz.create_canvas(title=f'Prototype Plot', sizing_mode='scale_width', plot_height=540, tools="pan,box_zoom,lasso_select,wheel_zoom,previewsave,reset")
-st_viz.add_map_tile('CARTODBPOSITRON')
+st_viz.create_canvas(title=f'Prototype Plot', sizing_mode='scale_width', height=540, tools="pan, box_zoom, lasso_select, wheel_zoom, hover, save, reset")
 
-st_viz.add_numerical_colormap('Viridis256', 'count', colorbar=True, cb_orientation='vertical', cb_location='right', label_standoff=12, border_line_color=None, location=(0,0), nan_color=bokeh_colors.RGB(1,1,1,0))
-st_viz.add_polygon(fill_color=st_viz.cmap, line_color=st_viz.cmap, fill_alpha=0.6, muted_alpha=0, legend_label=f'GPS Locations (Choropleth)')
+st_viz.add_numerical_colormap('Viridis256', 'count', colorbar=True, cb_orientation='vertical', cb_location='right', label_standoff=12, border_line_color=None, location=(0,0))
+st_viz.add_polygon(fill_color=st_viz.cmap, line_color=st_viz.cmap, fill_alpha=0.6, muted_alpha=0, legend_label=f'GPS Locations (Choropleth Map)')
+
+st_viz.figure.legend.location = "top_left"
+st_viz.figure.legend.click_policy = "mute"
+st_viz.figure.toolbar.active_scroll = st_viz.figure.select_one(bkhm.WheelZoomTool)
 
 
 

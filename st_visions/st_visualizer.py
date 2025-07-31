@@ -368,7 +368,7 @@ class st_visualizer:
         cmap: Dict
             The Numerical Colormap 
         """
-        if not(palette in ALLOWED_NUMERICAL_COLOR_PALETTES or isinstance(palette, palettes.Palette.__origin__)):
+        if not (palette in ALLOWED_NUMERICAL_COLOR_PALETTES or isinstance(palette, palettes.Palette.__origin__)):
             logger.error(f'❌ Invalid palette: "{palette}". Must be a tuple or one of the allowed palettes: {ALLOWED_NUMERICAL_COLOR_PALETTES}')
             sys.exit(1)            
             # raise ValueError(f'Invalid Palette. Allowed (pre-built) Palettes: {ALLOWED_NUMERICAL_COLOR_PALETTES}')
@@ -708,8 +708,7 @@ class st_visualizer:
         
         if filter_mode not in list(ALLOWED_FILTER_OPERATORS.keys()):
             logger.error(f' ❌ filter_mode must be one of the following: {list(ALLOWED_FILTER_OPERATORS.keys())}')
-            sys.exit(1)
-            # raise ValueError(f' ❌ filter_mode must be one of the following: {list(ALLOWED_FILTER_OPERATORS.keys())}')
+            raise ValueError(f' ❌ filter_mode must be one of the following: {list(ALLOWED_FILTER_OPERATORS.keys())}')
         
         start, end = self.data[numeric_name].agg(['min', 'max'])
         
