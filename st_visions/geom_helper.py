@@ -269,6 +269,7 @@ def classify_area_proximity(trajectories, spatial_areas, compensate=False, buffe
     return trajectories
 
 
+
 def quadrat_cut_geometry(geometry, quadrat_width, min_num=3, buffer_amount=1e-9):
     """
     Split a Polygon or MultiPolygon up into sub-polygons of a specified size, using quadrats.

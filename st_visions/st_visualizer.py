@@ -108,8 +108,8 @@ class st_visualizer:
         """
         if type(data) not in [type(gpd.GeoDataFrame()), type(pd.DataFrame())]:
             logger.error(f'"data" must be either a Pandas DataFrame or a GeoPandas GeoDataFrame, but got type: { type(data).__name__}')
-            # raise ValueError('"data" must be either a Pandas DataFrame or a GeoPandas GeoDataFrame')
-            sys.exit(1)
+            raise ValueError('"data" must be either a Pandas DataFrame or a GeoPandas GeoDataFrame')
+            
 
         if type(data) != type(gpd.GeoDataFrame()):
             data = geom_helper.create_geometry(data, coordinate_columns=sp_columns, crs=crs)
@@ -213,8 +213,7 @@ class st_visualizer:
         
         if (suffix is None or data is None):
             logger.error('You must either set a Dataset and/or set a Column suffix for extracted geometry coordinates.')
-            sys.exit(1)
-            # raise ValueError('You must either set a Dataset and/or set a Column suffix for extracted geometry coordinates.')
+            raise ValueError('Invalid Parameters for Geometry')
         
         for dim, coord_name in enumerate(self.sp_columns):
             data.loc[:, f'{coord_name}{suffix}'] = data.geometry.apply(lambda l: geom_helper.getCoords(l, dim, self.allow_complex_geometries))
@@ -234,8 +233,7 @@ class st_visualizer:
         """
         if self.data is None:
             logger.error('You must set a DataFrame first')
-            sys.exit(1)
-            # raise ValueError('You must set a DataFrame first.')
+            raise ValueError('No DataFrame set')
 
         # data_merc = self.data.iloc[:self.limit if limit is None else limit].copy()
         data_merc = self.prepare_data(suffix=suffix)
@@ -272,8 +270,7 @@ class st_visualizer:
         """
         if self.data is None:
             logger.error('You must set a DataFrame first')
-            sys.exit(1)
-            # raise ValueError('You must set a DataFrame first.')
+            raise ValueError('No DataFrame set.')
         
         if self.limit < len(self.data):
             title = f'{title} - Showing {self.limit} out of {len(self.data)} records'
@@ -313,8 +310,7 @@ class st_visualizer:
         """
         if not (isinstance(palette, tuple) or palette in ALLOWED_CATEGORICAL_COLOR_PALLETES):
             logger.error(f'❌ Invalid palette: "{palette}". Must be a tuple or one of the allowed palettes: {ALLOWED_CATEGORICAL_COLOR_PALLETES}')
-            sys.exit(1)
-            # raise ValueError(f'Invalid Palette Name/Tuple. Allowed Palettes: {ALLOWED_CATEGORICAL_COLOR_PALLETES}')
+            raise ValueError(f'Invalid Palette Name/Tuple.')
 
         categories = sorted(np.unique(self.source.data[categorical_name]).tolist())
         num_categories = len(categories)
@@ -369,9 +365,8 @@ class st_visualizer:
             The Numerical Colormap 
         """
         if not (palette in ALLOWED_NUMERICAL_COLOR_PALETTES or isinstance(palette, palettes.Palette.__origin__)):
-            logger.error(f'❌ Invalid palette: "{palette}". Must be a tuple or one of the allowed palettes: {ALLOWED_NUMERICAL_COLOR_PALETTES}')
-            sys.exit(1)            
-            # raise ValueError(f'Invalid Palette. Allowed (pre-built) Palettes: {ALLOWED_NUMERICAL_COLOR_PALETTES}')
+            logger.error(f'❌ Invalid palette: "{palette}". Must be a tuple or one of the allowed palettes: {ALLOWED_NUMERICAL_COLOR_PALETTES}')          
+            raise ValueError(f'Invalid Palette.')
 
         min_val, max_val = self.data[numeric_name].agg(['min', 'max']) if val_range is None else val_range
         cmap = bokeh_mdl.LinearColorMapper(
@@ -418,8 +413,7 @@ class st_visualizer:
         """
         if marker not in ALLOWED_BASIC_MARKERS:
             logger.error(f'❌ Invalid marker: "{marker}". Allowed markers are: {ALLOWED_BASIC_MARKERS}')
-            sys.exit(1)
-            # raise ValueError(f'marker must be one of the following: {ALLOWED_BASIC_MARKERS}')
+            raise ValueError(f'Invalid Marker')
 
         coordinates = [f'{col}{self.__suffix}' for col in self.sp_columns]
 
@@ -467,8 +461,7 @@ class st_visualizer:
         """
         if line_type not in ALLOWED_BASIC_LINE_TYPES:
             logger.error(f'❌ Invalid line_type: "{line_type}". Allowed types are: {ALLOWED_BASIC_LINE_TYPES}')
-            sys.exit(1)
-            # raise ValueError(f'line_type must be one of the following: {ALLOWED_BASIC_LINE_TYPES}')
+            raise ValueError(f'Invalid line type.')
 
         coordinates = [f'{col}{self.__suffix}' for col in self.sp_columns]
 
@@ -515,8 +508,7 @@ class st_visualizer:
         """
         if polygon_type not in ALLOWED_BASIC_POLYGON_TYPES:
             logger.error(f'❌ Invalid line_type: "{polygon_type}". Allowed types are: {ALLOWED_BASIC_POLYGON_TYPES}')
-            sys.exit(1)
-            # raise ValueError(f'line_type must be one of the following: {ALLOWED_BASIC_POLYGON_TYPES}')
+            raise ValueError(f'Invalid Line Type')
 
         coordinates = [f'{col}{self.__suffix}' for col in self.sp_columns]
 
@@ -708,7 +700,7 @@ class st_visualizer:
         
         if filter_mode not in list(ALLOWED_FILTER_OPERATORS.keys()):
             logger.error(f' ❌ filter_mode must be one of the following: {list(ALLOWED_FILTER_OPERATORS.keys())}')
-            raise ValueError(f' ❌ filter_mode must be one of the following: {list(ALLOWED_FILTER_OPERATORS.keys())}')
+            raise ValueError(f' Invalid Filter Mode.')
         
         start, end = self.data[numeric_name].agg(['min', 'max'])
         
