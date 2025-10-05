@@ -10,11 +10,8 @@ import threading
 import time
 from kafka import KafkaConsumer
 from kafka.admin import KafkaAdminClient, NewTopic
-import geopandas as gpd
-from shapely import wkt
 
-from st_visions.st_visualizer import st_visualizer
-import st_visions.express as viz_express
+from st_visualizer import st_visualizer
 
 class st_vizstream:
     def __init__(self, topic_name="default-topic", bootstrap_servers="localhost:9092", group_id="stream-group"):
@@ -23,7 +20,7 @@ class st_vizstream:
         self.bootstrap_servers = bootstrap_servers
         self.group_id = group_id
 
-        self.plot = None
+        self.visualization = st_visualizer()
 
         self.consumer = None
         self._thread = None
@@ -62,16 +59,17 @@ class st_vizstream:
                 msg_pack = self.consumer.poll(timeout_ms=500)
                 for tp, messages in msg_pack.items():
                     for msg in messages:
-                        print("Message received:")
-                        print(f"  Key: {msg.key}")
-                        print(f"  Value: {msg.value}")
-                        print("-" * 40)
+                        vessel = msg.value.get("vessel_id", "unknown")
+                        lon = msg.value.get("lon")
+                        lat = msg.value.get("lat")
+                        speed = msg.value.get("speed", "N/A")
+
+                        print(f"[KAFKA CONSUMER] Consumed the following values Vessel {vessel} @({lon}, {lat}) | Speed: {speed}")
                 time.sleep(0.05)
         except Exception as e:
             print(f"Consumer error: {e}")
         finally:
             self.consumer.close()
-            print(" Kafka consumer stopped.")
 
     def start(self):
         if self._thread and self._thread.is_alive():
@@ -89,3 +87,11 @@ class st_vizstream:
             self._thread.join(timeout=5)
             self._thread = None
         print("Consumer stopped")
+
+if __name__ == "__main__":
+    streamer = st_vizstream(topic_name='ais-topic')
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        streamer.stop()
