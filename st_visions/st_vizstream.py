@@ -20,8 +20,6 @@ class st_vizstream:
         self.bootstrap_servers = bootstrap_servers
         self.group_id = group_id
 
-        self.visualization = st_visualizer()
-
         self.consumer = None
         self._thread = None
         self._stop = False
