@@ -8,4 +8,4 @@ old/
 ST_VisionsEnv
 .ipynb_checkpoints
 data
-
+.venv

@@ -5,3 +5,8 @@ pandas
 geopandas
 numpy
 PyYAML
+pyarrow
+kafka-python
+loguru
+
+
