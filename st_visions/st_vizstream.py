@@ -21,6 +21,7 @@ class ST_AbstractStream(ABC):
         self._thread = None
         self._stop = False
         self.data_queue = Queue()
+        self.max_queue_size = None
 
 
     @abstractmethod
@@ -102,12 +103,15 @@ class ST_KafkaStream(ST_AbstractStream):
     Kafka-based implementation of ST_AbstractStream.
     Consumes messages from a Kafka topic 
 
+    Default batch size is 1000
+
     """
 
-    def __init__(self, topic_name="default-topic", bootstrap_servers="localhost:9092", group_id="stream-group"):
+    def __init__(self, topic_name="default-topic", bootstrap_servers="localhost:9092", group_id="stream-group", max_queue_size = 10000):
         super().__init__(topic_name)
         self.bootstrap_servers = bootstrap_servers
         self.group_id = group_id
+        self.max_queue_size = max_queue_size
 
         self._assert_topic()
         self.start()
@@ -142,34 +146,33 @@ class ST_KafkaStream(ST_AbstractStream):
         print(f"---------------------------------")
         print(f"Listening to topic '{self.topic}'...")
 
-    def get_geojson(self, max_points=500):
+    def get_stream_data(self, max_points=500):
         """
-        Collect all features from the queue and return a GeoJSON FeatureCollection.
+        Drain the queue and return all records as a columnar dict (orient='list').
+        Each record is consumed exactly once.
+        Only returns up to the last `max_points` records.
         """
-        features = []
-
-        while not self.data_queue.empty():
-            features.append(self.data_queue.get())
-
-        if not features:
+        if self.data_queue.empty():
             return None
 
-        if len(features) > max_points:
-            features = features[-max_points:]
+        records = []
+        while not self.data_queue.empty():
+            records.append(self.data_queue.get())
 
-        geojson = {
-            "type": "FeatureCollection",
-            "features": features
-        }
+        if not records:
+            return None
 
-        return json.dumps(geojson)
+        data = {k: [] for k in records[0].keys()}
+        for record in records:
+            for k, v in record.items():
+                data[k].append(v)
 
+        for k in data.keys():
+            data[k] = data[k][-max_points:]
+
+        return data
 
     def _poll_data(self):
-        """
-        Poll Kafka and push messages as GeoJSON features into a queue
-        
-        """
         msg_pack = self.consumer.poll(timeout_ms=500)
         for tp, messages in msg_pack.items():
             for msg in messages:
@@ -177,12 +180,11 @@ class ST_KafkaStream(ST_AbstractStream):
                 lon = value.get("lon")
                 lat = value.get("lat")
 
-                if lon is not None and lat is not None:
-                    feature = {
-                        "type": "Feature",
-                        "geometry": {"type": "Point", "coordinates": [lon, lat]}
-                    }
+                if lon is None or lat is None:
+                    continue
 
-                    self.data_queue.put(feature)
-                    print(f"Received: {feature} ")
-        
+                # insert to queue check 
+                if self.data_queue.qsize() >= self.max_queue_size:
+                    _ = self.data_queue.get()
+                self.data_queue.put(value)
+            
