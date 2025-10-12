@@ -4,42 +4,131 @@
     Authors: Paraschos Moraitis, Andreas Tritsarolis
 '''
 
-
-import json
 import threading
 import time
+import json
+from abc import ABC, abstractmethod
+from queue import Queue
+
 from kafka import KafkaConsumer
 from kafka.admin import KafkaAdminClient, NewTopic
 
-from st_visualizer import st_visualizer
+class ST_AbstractStream(ABC):
 
-class st_vizstream:
-    def __init__(self, topic_name="default-topic", bootstrap_servers="localhost:9092", group_id="stream-group"):
-
+    def __init__(self, topic_name: str):
         self.topic = topic_name
-        self.bootstrap_servers = bootstrap_servers
-        self.group_id = group_id
-
         self.consumer = None
         self._thread = None
         self._stop = False
+        self.data_queue = Queue()
 
+
+    @abstractmethod
+    def _connect(self):
+        """
+        Abstract method that initializes a given stream connection from a provider (e.g Kafka)
+        """
+        pass
+
+    @abstractmethod
+    def _poll_data(self):
+        """
+        Abstract method for data polling and processing
+        """
+        pass
+
+
+    def _consume_loop(self):
+        """
+        Data consumption loop for a given stream
+        """
+        try:
+            self._connect()
+        except Exception as e:
+            print(f"[STREAM ERROR] Failed to connect: {e}")
+            return 
+
+        try:
+            while not self._stop:
+                self._poll_data()
+                time.sleep(0.05)
+        except Exception as e:
+            print(f"[STREAM ERROR] {e}")
+        finally:
+            self._close()
+
+
+    def start(self):
+        """
+        Start background thread
+        
+        """
+        if self._thread and self._thread.is_alive():
+            print("Stream already running.")
+            return
+
+        self._stop = False
+        self._thread = threading.Thread(target=self._consume_loop, daemon=True)
+        self._thread.start()
+        print("Stream thread initialized")
+
+    def stop(self):
+        """
+        Stop background thread
+        
+        """
+        print("Stopping stream...")
+        self._stop = True
+        if self._thread:
+            self._thread.join(timeout=5)
+            self._thread = None
+        print("Stream stopped")
+
+    def _close(self):
+        """
+        Thread cleanup method
+        
+        """
+        if self.consumer:
+            try:
+                self.consumer.close()
+            except Exception:
+                pass
+
+
+
+class ST_KafkaStream(ST_AbstractStream):
+    """
+    Kafka-based implementation of ST_AbstractStream.
+    Consumes messages from a Kafka topic 
+
+    """
+
+    def __init__(self, topic_name="default-topic", bootstrap_servers="localhost:9092", group_id="stream-group"):
+        super().__init__(topic_name)
+        self.bootstrap_servers = bootstrap_servers
+        self.group_id = group_id
 
         self._assert_topic()
         self.start()
 
     def _assert_topic(self):
-        admin_client = KafkaAdminClient(bootstrap_servers=self.bootstrap_servers)
-        existing_topics = admin_client.list_topics()
-        if self.topic not in existing_topics:
+        admin = KafkaAdminClient(bootstrap_servers=self.bootstrap_servers)
+        existing = admin.list_topics()
+
+        if self.topic not in existing:
             print(f"Creating topic '{self.topic}'...")
-            topic = NewTopic(name=self.topic, num_partitions=1, replication_factor=1)
-            admin_client.create_topics(new_topics=[topic])
+            new_topic = NewTopic(name=self.topic, num_partitions=1, replication_factor=1)
+            admin.create_topics(new_topics=[new_topic])
         else:
             print(f"Topic '{self.topic}' exists.")
-        admin_client.close()
+        admin.close()
 
-    def _consume_data(self):
+    def _connect(self):
+        """
+        Initialize the Kafka Consumer
+        
+        """
         self.consumer = KafkaConsumer(
             self.topic,
             bootstrap_servers=self.bootstrap_servers,
@@ -47,49 +136,53 @@ class st_vizstream:
             auto_offset_reset='earliest',
             enable_auto_commit=True,
             key_deserializer=lambda k: k.decode() if k else None,
-            value_deserializer=lambda v: json.loads(v.decode('utf-8'))
+            value_deserializer=lambda v: json.loads(v.decode('utf-8')),
         )
+        print(f"Connected to stream successfully!")
+        print(f"---------------------------------")
+        print(f"Listening to topic '{self.topic}'...")
 
-        print(f"Listening to {self.topic}'...")
+    def get_geojson(self, max_points=500):
+        """
+        Collect all features from the queue and return a GeoJSON FeatureCollection.
+        """
+        features = []
 
-        try:
-            while not self._stop:
-                msg_pack = self.consumer.poll(timeout_ms=500)
-                for tp, messages in msg_pack.items():
-                    for msg in messages:
-                        vessel = msg.value.get("vessel_id", "unknown")
-                        lon = msg.value.get("lon")
-                        lat = msg.value.get("lat")
-                        speed = msg.value.get("speed", "N/A")
+        while not self.data_queue.empty():
+            features.append(self.data_queue.get())
 
-                        print(f"[KAFKA CONSUMER] Consumed the following values Vessel {vessel} @({lon}, {lat}) | Speed: {speed}")
-                time.sleep(0.05)
-        except Exception as e:
-            print(f"Consumer error: {e}")
-        finally:
-            self.consumer.close()
+        if not features:
+            return None
 
-    def start(self):
-        if self._thread and self._thread.is_alive():
-            print("Consumer already running.")
-            return
-        self._stop = False
-        self._thread = threading.Thread(target=self._consume_data, daemon=True)
-        self._thread.start()
-        print("Consumer thread started")
+        if len(features) > max_points:
+            features = features[-max_points:]
 
-    def stop(self):
-        print("Stopping consumer...")
-        self._stop = True
-        if self._thread:
-            self._thread.join(timeout=5)
-            self._thread = None
-        print("Consumer stopped")
+        geojson = {
+            "type": "FeatureCollection",
+            "features": features
+        }
 
-if __name__ == "__main__":
-    streamer = st_vizstream(topic_name='ais-topic')
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        streamer.stop()
+        return json.dumps(geojson)
+
+
+    def _poll_data(self):
+        """
+        Poll Kafka and push messages as GeoJSON features into a queue
+        
+        """
+        msg_pack = self.consumer.poll(timeout_ms=500)
+        for tp, messages in msg_pack.items():
+            for msg in messages:
+                value = msg.value
+                lon = value.get("lon")
+                lat = value.get("lat")
+
+                if lon is not None and lat is not None:
+                    feature = {
+                        "type": "Feature",
+                        "geometry": {"type": "Point", "coordinates": [lon, lat]}
+                    }
+
+                    self.data_queue.put(feature)
+                    print(f"Received: {feature} ")
+        

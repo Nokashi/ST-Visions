@@ -10,9 +10,12 @@ import operator
 import numpy as np
 import pandas as pd
 import geopandas as gpd
+import time
 from loguru import logger
 import itertools
 from itertools import islice
+from pyproj import Transformer
+import json
 
 import bokeh
 import bokeh.io as bokeh_io
@@ -21,7 +24,7 @@ import bokeh.models as bokeh_mdl
 import bokeh.palettes as palettes
 
 from bokeh.plotting import figure, reset_output, output_notebook, show
-from bokeh.models import ColumnDataSource, CDSView, HoverTool, WheelZoomTool, GroupFilter, BooleanFilter, CustomJS, Slider, DateSlider
+from bokeh.models import ColumnDataSource, GeoJSONDataSource, CDSView, HoverTool, WheelZoomTool, GroupFilter, BooleanFilter, CustomJS, Slider, DateSlider
 from bokeh.layouts import column, row
 
 # Importing Helper Libraries
@@ -29,6 +32,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__)))
 import geom_helper
 import callbacks
 import providers
+import st_vizstream
 
 
 # Defining Allowed Values (per use-case)
@@ -74,6 +78,8 @@ class st_visualizer:
         self.cmap = None
         self.__suffix = None
         self.aquire_canvas_data = None 
+
+        self.stream = None
     
 
     def __set_data(self, data, columns):
@@ -92,7 +98,7 @@ class st_visualizer:
         self.data = data
         self.sp_columns = columns
 
-
+    #TODO: conditional for streaming support (is instance etc etc etc)
     def set_data(self, data, sp_columns=['lon', 'lat'], crs='epsg:4326'):
         """
         Loading a Dataset to a VISIONS instance.
@@ -186,6 +192,144 @@ class st_visualizer:
 
         self.__set_data(data, sp_columns)
 
+    ##############################################################################
+    #### KAFKA STREAM ###########################################################
+    ###############################################################################
+
+    #TODO: get_data_stream(self.stream etc...)
+    def get_data_kafka_stream(self, topic_name="st-viz-topic", bootstrap_servers="localhost:9092", group_id="st-viz-group"):
+        """
+        Initialize a Kafka-based data stream. Creates a :class:`ST_KafkaStream` instance and starts consuming messages from the specified kafka topic.
+
+        Data is stored in GeoJSON data format
+
+        Parameters
+        ----------
+        topic_name : str, optional
+            Name of the Kafka topic to subscribe to. Default is ``'st-viz-topic'``.
+        bootstrap_servers : str, optional
+            Comma-separated list of Kafka bootstrap server addresses. 
+            Default is ``'localhost:9092'``.
+        group_id : str, optional
+            Identifier for the Kafka consumer group. Default is ``'st-viz-group'``.
+
+        Notes
+        -----
+        The stream runs on a background thread. You can retrieve the latest 
+        GeoJSON FeatureCollection from the associated queue using 
+        :meth:`self.stream.get_geojson`.
+
+        """
+
+        self.stream = st_vizstream.ST_KafkaStream(
+            topic_name=topic_name,
+            bootstrap_servers=bootstrap_servers,
+            group_id=group_id
+        )
+
+
+    def stop_stream(self):
+        """
+        Stop the Kafka data stream and release resources.
+        """
+        if self.stream:
+            self.stream.stop()
+            self.stream = None
+
+    def get_geojson(self):
+        """
+        Fetch latest GeoJSON FeatureCollection from stream.
+        """
+        if self.stream:
+            return self.stream.get_geojson()
+        return None
+    
+    def prepare_stream_geojson(self):
+        """
+        Fetch the latest GeoJSON from the Kafka stream and convert it to 
+        Web Mercator coordinates for Bokeh plotting.
+        """
+        geojson_str = self.get_geojson()
+        if geojson_str is None:
+            return None
+
+        geo = json.loads(geojson_str)
+        transformer = Transformer.from_crs("EPSG:4326", "EPSG:3857", always_xy=True)
+
+        for feature in geo["features"]:
+            geom_type = feature["geometry"]["type"]
+            coords = feature["geometry"]["coordinates"]
+
+            if geom_type == "Point":
+                lon, lat = coords
+                x, y = transformer.transform(lon, lat)
+                feature["geometry"]["coordinates"] = [x, y]
+            elif geom_type == "LineString":
+                feature["geometry"]["coordinates"] = [list(transformer.transform(lon, lat)) for lon, lat in coords]
+            elif geom_type == "Polygon":
+                feature["geometry"]["coordinates"] = [
+                    [list(transformer.transform(lon, lat)) for lon, lat in ring] for ring in coords
+                ]
+
+        return json.dumps(geo)
+        
+    def create_stream_source(self):
+        """
+        Create a Bokeh GeoJSONDataSource from the latest Kafka stream data.
+        
+        Returns
+        -------
+        GeoJSONDataSource
+        """
+        geojson_merc = self.prepare_stream_geojson()
+        if geojson_merc is None:
+            return None
+        return GeoJSONDataSource(geojson=geojson_merc)
+    
+    def create_geojson_canvas(self, title="Live GeoJSON Canvas", x_range=None, y_range=None, tile_provider="CARTODBPOSITRON", tile_kwargs={}, **kwargs ):
+        """
+        Create a Bokeh Canvas using the latest GeoJSON from the Kafka stream if available.
+        """
+
+        geojson_merc = self.prepare_stream_geojson() if self.stream else None
+
+        if geojson_merc is not None:
+            self.source = GeoJSONDataSource(geojson=geojson_merc)
+
+
+            # Determine bounds if not given
+            if x_range is None or y_range is None:
+                geo = json.loads(geojson_merc)
+                xs, ys = [], []
+                for f in geo["features"]:
+                    coords = f["geometry"]["coordinates"]
+                    if f["geometry"]["type"] == "Point":
+                        x, y = coords
+                        xs.append(x)
+                        ys.append(y)
+                    elif f["geometry"]["type"] in ["LineString", "Polygon"]:
+                        flat_coords = np.array(coords).reshape(-1, 2)
+                        xs.extend(flat_coords[:,0])
+                        ys.extend(flat_coords[:,1])
+                if x_range is None:
+                    x_range = (min(xs), max(xs))
+                if y_range is None:
+                    y_range = (min(ys), max(ys))
+        else:
+            logger.error("No data or GeoJSON stream available to plot")
+            raise ValueError("No data in stream")
+        
+        fig = figure(x_range=x_range, y_range=y_range, x_axis_type="mercator", y_axis_type="mercator", title=title, **kwargs)
+        self.set_figure(fig)
+
+        providers.add_tile_to_canvas(self, tile_provider=tile_provider, **tile_kwargs)
+    
+
+    ##############################################################################
+    #############################################################################
+
+    # KAFKA STREAM IMPLEMENTATION ABOVE
+    ########################################################################
 
     def prepare_data(self, data=None, suffix=None):
         """
@@ -431,6 +575,52 @@ class st_visualizer:
 
         self.renderers.append(renderer)
 
+        return renderer
+    
+    def add_marker_geojson(self, marker='circle', size=10, color='royalblue', sec_color='lightslategray', alpha=0.7, muted_alpha=0, **kwargs):
+        """
+        Add a Glyph to the Canvas using a GeoJSONDataSource.
+        
+        Parameters
+        ----------
+        glyph_type: str (default: ```'circle'```)
+            The Glyph's type
+        size: int (default: 10)
+            The Glyph's size
+        color: str or bokeh.colors instance (default: ```'royalblue'```)
+            The Glyph's primary color
+        sec_color: str or bokeh.colors instance (default: ```'lightslategray'```)
+            The Glyph's secondary color (i.e., the glyph's color when disselected).        
+        alpha:float (values in [0,1] -- default: ```0.7```)
+            The Glyph's overall alpha
+        muted_alpha:float (values in [0,1] -- default: ```0```)
+            The Glyph's alpha when disabled from the legend
+        **kwargs: Dict
+            Other arguments related to the creation of a Glyph
+        
+        Returns
+        -------
+        renderer: Bokeh glyph instance
+            The instance of the added glyph
+        """
+        if not isinstance(self.source, GeoJSONDataSource):
+            logger.error("Invalid Source Type")
+            raise ValueError("Source must be a GeoJSONDataSource")
+        
+        renderer = self.figure.scatter(
+            x="x",
+            y="y",
+            size=size,
+            marker=marker,
+            color=color,
+            nonselection_fill_color=sec_color,
+            alpha=alpha,
+            muted_alpha=muted_alpha,
+            source=self.source,
+            **kwargs
+        )
+
+        self.renderers.append(renderer)
         return renderer
     
 
