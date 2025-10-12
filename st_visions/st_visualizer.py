@@ -10,12 +10,10 @@ import operator
 import numpy as np
 import pandas as pd
 import geopandas as gpd
-import time
 from loguru import logger
 import itertools
 from itertools import islice
-from pyproj import Transformer
-import json
+import pyarrow as pa 
 
 import bokeh
 import bokeh.io as bokeh_io
@@ -79,7 +77,7 @@ class st_visualizer:
         self.__suffix = None
         self.aquire_canvas_data = None 
 
-        self.stream = None
+        self._stream = None
     
 
     def __set_data(self, data, columns):
@@ -112,15 +110,24 @@ class st_visualizer:
         crs: str (default: ```'epsg:4326'```) 
             The CRS of the Dataset's spatial coordinates
         """
-        if type(data) not in [type(gpd.GeoDataFrame()), type(pd.DataFrame())]:
+        if self.stream and isinstance(data, dict):
+            try:
+                # Convert to PyArrow Table → Pandas
+                table = pa.table(data)
+                data = table.to_pandas()
+            except Exception as e:
+                logger.error(f'Cant convert the streaming data to a dataframe')
+                raise ValueError(f"Failed to convert streaming data to DataFrame: {e}")
+
+        if not isinstance(data, (gpd.GeoDataFrame, pd.DataFrame)):
             logger.error(f'"data" must be either a Pandas DataFrame or a GeoPandas GeoDataFrame, but got type: { type(data).__name__}')
             raise ValueError('"data" must be either a Pandas DataFrame or a GeoPandas GeoDataFrame')
             
 
-        if type(data) != type(gpd.GeoDataFrame()):
+        if not isinstance(data, gpd.GeoDataFrame):
             data = geom_helper.create_geometry(data, coordinate_columns=sp_columns, crs=crs)
         
-        self.__set_data(data, sp_columns)              
+        self.__set_data(data, sp_columns)            
 
 
     def set_figure(self, figure=None):
@@ -146,6 +153,76 @@ class st_visualizer:
             The communication 'bridge' that will send data from the loaded dataset to the Canvas.
         """
         self.source = source
+    
+    def connect_to_kafka(self, topic_name="st-viz-topic", bootstrap_servers="localhost:9092", group_id="st-viz-group"):
+        """
+        Initialize a Kafka-based data stream. Creates a :class:`ST_KafkaStream` instance and starts consuming messages from the specified kafka topic.
+
+        Data is stored in GeoJSON data format
+
+        Parameters
+        ----------
+        topic_name : str, optional
+            Name of the Kafka topic to subscribe to. Default is ``'st-viz-topic'``.
+        bootstrap_servers : str, optional
+            Comma-separated list of Kafka bootstrap server addresses. 
+            Default is ``'localhost:9092'``.
+        group_id : str, optional
+            Identifier for the Kafka consumer group. Default is ``'st-viz-group'``.
+
+        Notes
+        -----
+        The stream runs on a background thread. You can retrieve the latest 
+        GeoJSON FeatureCollection from the associated queue using 
+        :meth:`self.stream.get_geojson`.
+
+        """
+        self._stream = st_vizstream.ST_KafkaStream(
+            topic_name=topic_name,
+            bootstrap_servers=bootstrap_servers,
+            group_id=group_id
+        )
+
+        return self._stream
+
+    def get_data_stream(self, stream, sp_columns=['lon', 'lat'], crs='epsg:4326', max_points=500):
+        """
+        Consume Data from a streaming source and parse it as a GeoDataFrame
+
+        The method retrieves up to `max_points` recent records from the provided 
+        stream instance, converts the columnar data into a Pandas DataFrame using 
+        PyArrow, and then transforms it into a GeoPandas GeoDataFrame with the 
+        specified spatial columns and coordinate reference system (CRS). The resulting 
+        GeoDataFrame is loaded into the VISIONS instance via `__set_data`.
+
+        Parameters
+        ----------
+        stream : object of abstract type ST_AbstractStream (kafka or any other data streaming technology)
+            The stream instance. returns a columnar dictionary in orient='list' format.
+        sp_columns: List (default: ```['lon', 'lat']```)
+            The (ordered) list of columns that contain the spatial coordinates
+        crs: str (default: ```'epsg:4326'```)  
+            The CRS of the Dataset's spatial coordinates
+        max_points : int (default: ```'500'```)  
+            Maximum number of most recent records to retrieve from the stream. Default is 500.
+
+        """
+        if not stream:
+            raise ValueError("No stream provided")
+
+        data_dict = stream.get_stream_data(max_points=max_points)
+        if not data_dict:
+            print("No data available in stream")
+            return None
+
+        try:
+            table = pa.table(data_dict)
+            data = table.to_pandas()
+        except Exception as e:
+            raise ValueError(f"Failed to convert stream data to DataFrame: {e}")
+        
+        data = geom_helper.create_geometry(data, coordinate_columns=sp_columns, crs=crs)
+        self.__set_data(data, sp_columns)
 
 
     def get_data_csv(self, filepath, sp_columns=['lon', 'lat'], crs='epsg:4326', **kwargs):

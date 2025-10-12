@@ -37,6 +37,9 @@ class ST_AbstractStream(ABC):
         Abstract method for data polling and processing
         """
         pass
+    @abstractmethod
+    def get_stream_data(self, max_points):
+        pass
 
 
     def _consume_loop(self):
@@ -103,7 +106,7 @@ class ST_KafkaStream(ST_AbstractStream):
     Kafka-based implementation of ST_AbstractStream.
     Consumes messages from a Kafka topic 
 
-    Default batch size is 1000
+    Default queue size is 10000
 
     """
 
@@ -148,9 +151,7 @@ class ST_KafkaStream(ST_AbstractStream):
 
     def get_stream_data(self, max_points=500):
         """
-        Drain the queue and return all records as a columnar dict (orient='list').
-        Each record is consumed exactly once.
-        Only returns up to the last `max_points` records.
+        Drain the queue and return all records as a columnar dict (orient='list') up until max_points
         """
         if self.data_queue.empty():
             return None
