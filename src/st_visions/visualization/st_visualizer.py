@@ -30,7 +30,6 @@ sys.path.append(os.path.join(os.path.dirname(__file__)))
 import geom_helper
 import callbacks
 import providers
-import st_vizstream
 
 
 # Defining Allowed Values (per use-case)
@@ -110,9 +109,8 @@ class st_visualizer:
         crs: str (default: ```'epsg:4326'```) 
             The CRS of the Dataset's spatial coordinates
         """
-        if self.stream and isinstance(data, dict):
+        if isinstance(data, dict):
             try:
-                # Convert to PyArrow Table → Pandas
                 table = pa.table(data)
                 data = table.to_pandas()
             except Exception as e:
@@ -153,47 +151,10 @@ class st_visualizer:
             The communication 'bridge' that will send data from the loaded dataset to the Canvas.
         """
         self.source = source
-    
-    def connect_to_kafka(self, topic_name="st-viz-topic", bootstrap_servers="localhost:9092", group_id="st-viz-group"):
-        """
-        Initialize a Kafka-based data stream. Creates a :class:`ST_KafkaStream` instance and starts consuming messages from the specified kafka topic.
 
-        Data is stored in GeoJSON data format
-
-        Parameters
-        ----------
-        topic_name : str, optional
-            Name of the Kafka topic to subscribe to. Default is ``'st-viz-topic'``.
-        bootstrap_servers : str, optional
-            Comma-separated list of Kafka bootstrap server addresses. 
-            Default is ``'localhost:9092'``.
-        group_id : str, optional
-            Identifier for the Kafka consumer group. Default is ``'st-viz-group'``.
-
-        Notes
-        -----
-        The stream runs on a background thread. You can retrieve the latest 
-        GeoJSON FeatureCollection from the associated queue using 
-        :meth:`self.stream.get_geojson`.
-
-        """
-        self._stream = st_vizstream.ST_KafkaStream(
-            topic_name=topic_name,
-            bootstrap_servers=bootstrap_servers,
-            group_id=group_id
-        )
-
-        return self._stream
-
-    def get_data_stream(self, stream, sp_columns=['lon', 'lat'], crs='epsg:4326', max_points=500):
+    def get_data_stream(self, stream, sp_columns=['lon', 'lat'], crs='epsg:4326'):
         """
         Consume Data from a streaming source and parse it as a GeoDataFrame
-
-        The method retrieves up to `max_points` recent records from the provided 
-        stream instance, converts the columnar data into a Pandas DataFrame using 
-        PyArrow, and then transforms it into a GeoPandas GeoDataFrame with the 
-        specified spatial columns and coordinate reference system (CRS). The resulting 
-        GeoDataFrame is loaded into the VISIONS instance via `__set_data`.
 
         Parameters
         ----------
@@ -210,7 +171,7 @@ class st_visualizer:
         if not stream:
             raise ValueError("No stream provided")
 
-        data_dict = stream.get_stream_data(max_points=max_points)
+        data_dict = stream.get_stream_data(max_points=self.limit)
         if not data_dict:
             print("No data available in stream")
             return None

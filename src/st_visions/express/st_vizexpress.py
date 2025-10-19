@@ -5,7 +5,7 @@
 '''    
 
 import bokeh.models as bokeh_models
-import providers
+import st_visions.visualization.providers
 
 
 def plot_points_on_map(obj, tools=None, tile_provider='CARTODBPOSITRON', marker='circle', size=10, color='royalblue', alpha=0.7, fill_alpha=0.6, muted_alpha=0, legend_label=f'Object GPS Locations', sizing_mode='scale_width', tile_kwargs={}, **kwargs):
