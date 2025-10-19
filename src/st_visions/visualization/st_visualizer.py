@@ -164,8 +164,6 @@ class st_visualizer:
             The (ordered) list of columns that contain the spatial coordinates
         crs: str (default: ```'epsg:4326'```)  
             The CRS of the Dataset's spatial coordinates
-        max_points : int (default: ```'500'```)  
-            Maximum number of most recent records to retrieve from the stream. Default is 500.
 
         """
         if not stream:
@@ -184,6 +182,67 @@ class st_visualizer:
         
         data = geom_helper.create_geometry(data, coordinate_columns=sp_columns, crs=crs)
         self.__set_data(data, sp_columns)
+
+    def create_stream_visualization(self, stream, sp_columns=['lon','lat'], crs='epsg:4326', suffix='_merc', refresh_rate=500):
+        """
+        Initialize the streaming pipeline and update the Bokeh CDS.
+        
+        Parameters
+        ----------
+        stream : object of abstract type ST_AbstractStream (kafka or any other data streaming technology)
+            The stream instance. returns a columnar dictionary in orient='list' format.
+        sp_columns: List (default: ```['lon', 'lat']```)
+            The (ordered) list of columns that contain the spatial coordinates
+        crs: str (default: ```'epsg:4326'```)  
+            The CRS of the Dataset's spatial coordinates
+        suffix: str (default: ```'_merc'```)
+            A suffix for the column name of the extracted spatial coordinates
+        refresh_rate : int (default: ```500```)
+            Milliseconds between periodic updates.
+        """
+
+        if not stream:
+            raise ValueError("No stream provided")
+        
+        def process_batch(batch_df):
+            batch_df = geom_helper.create_geometry(batch_df, coordinate_columns=sp_columns, crs=crs)
+            batch_df = self.prepare_data(batch_df, suffix=suffix)
+            
+            batch_dict = batch_df.drop(columns=[batch_df.geometry.name]).to_dict(orient='list')
+            return batch_dict
+
+        # data boostrap if its the first call 
+        if self.source is None:
+            first_batch = stream.get_stream_data(max_points=self.limit)
+            self.sp_columns = sp_columns
+
+            if not first_batch:
+                logger.warning("No data available to bootstrap the source")
+                return
+
+            first_df = pa.table(first_batch).to_pandas()
+            first_dict = process_batch(first_df)
+            self.source = ColumnDataSource(first_dict)
+            logger.info("Bootstrapped CDS with initial data")
+
+        # bokeh periodic update 
+        def update_callback():
+            try:
+                batch = stream.get_stream_data(max_points=self.limit)
+                if not batch:
+                    return
+
+                batch_df = pa.table(batch).to_pandas()
+                batch_dict = process_batch(batch_df)
+
+                # Stream directly to the CDS
+                self.source.stream(batch_dict, rollover=self.limit)
+
+            except Exception as e:
+                logger.error(f"Stream update failed: {e}")
+
+        bokeh_io.curdoc().add_periodic_callback(update_callback, refresh_rate)
+        logger.info(f"Started periodic stream callback ({refresh_rate} ms)")
 
 
     def get_data_csv(self, filepath, sp_columns=['lon', 'lat'], crs='epsg:4326', **kwargs):
