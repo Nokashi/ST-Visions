@@ -45,7 +45,7 @@ ALLOWED_NUMERICAL_COLOR_PALETTES = ['Blues256', 'Greens256', 'Greys256', 'Infern
 class st_visualizer:
 
 
-    def __init__(self, limit=30000, allow_complex_geometries=False, proj='epsg:3857'):
+    def __init__(self, limit=30000, allow_complex_geometries=False, target_crs='epsg:3857', doc = None, sp_columns=['lon', 'lat']):
         """
         Constructor for creating a VISIONS Instance.
             
@@ -55,16 +55,16 @@ class st_visualizer:
             The maximum number of geometries (glyphs/polygons/lines) to be visualized.
         allow_complex_geometries: boolean (default: False)
             Choose to plot either the polygons' exterior (False) or along with its inner voids (True)
-        proj: str (default: ```'epsg:3857'```)
-            The CRS that the input geometries will be projected to prior to visualization.
+        target_crs: str (default: ```'epsg:3857'```)
+            The target crs that the input geometries will be projected to prior to visualization.
         """
         self.limit = limit
         self.allow_complex_geometries = allow_complex_geometries
-        self.proj = proj
+        self.proj = target_crs
 
         self.data = None
         self.canvas_data = None
-        self.sp_columns = None
+        self.sp_columns = sp_columns
         
         self.figure = None
         self.source = None
@@ -77,6 +77,7 @@ class st_visualizer:
         self.aquire_canvas_data = None 
 
         self._stream = None
+        self.doc = doc #TODO: Might break at multiple instances. might need refactor
     
 
     def __set_data(self, data, columns):
@@ -96,7 +97,7 @@ class st_visualizer:
         self.sp_columns = columns
 
     #TODO: conditional for streaming support (is instance etc etc etc)
-    def set_data(self, data, sp_columns=['lon', 'lat'], crs='epsg:4326'):
+    def set_data(self, data, source_crs='epsg:4326'):
         """
         Loading a Dataset to a VISIONS instance.
             
@@ -104,9 +105,7 @@ class st_visualizer:
         ----------
         data: Pandas DataFrame or GeoPandas GeoDataFrame
             The Dataset that will be loaded to the instance
-        sp_columns: List (default: ```['lon', 'lat']```)
-            The (ordered) column names for the location of the spatial coordinates.
-        crs: str (default: ```'epsg:4326'```) 
+        source_crs: str (default: ```'epsg:4326'```) 
             The CRS of the Dataset's spatial coordinates
         """
         if isinstance(data, dict):
@@ -123,9 +122,9 @@ class st_visualizer:
             
 
         if not isinstance(data, gpd.GeoDataFrame):
-            data = geom_helper.create_geometry(data, coordinate_columns=sp_columns, crs=crs)
+            data = geom_helper.create_geometry(data, coordinate_columns=self.sp_columns, source_crs=source_crs)
         
-        self.__set_data(data, sp_columns)            
+        self.__set_data(data, self.sp_columns)            
 
 
     def set_figure(self, figure=None):
@@ -138,9 +137,8 @@ class st_visualizer:
             The canvas in which the data will be drawn to.
         """
         self.figure = figure
-        
 
-
+    
     def set_source(self, source=None):
         """
         Load a CDS to the class' attributes
@@ -152,7 +150,7 @@ class st_visualizer:
         """
         self.source = source
 
-    def get_data_stream(self, stream, sp_columns=['lon', 'lat'], crs='epsg:4326'):
+    def get_data_stream(self, stream, source_crs='epsg:4326'):
         """
         Consume Data from a streaming source and parse it as a GeoDataFrame
 
@@ -160,15 +158,14 @@ class st_visualizer:
         ----------
         stream : object of abstract type ST_AbstractStream (kafka or any other data streaming technology)
             The stream instance. returns a columnar dictionary in orient='list' format.
-        sp_columns: List (default: ```['lon', 'lat']```)
-            The (ordered) list of columns that contain the spatial coordinates
-        crs: str (default: ```'epsg:4326'```)  
+        source_crs: str (default: ```'epsg:4326'```)  
             The CRS of the Dataset's spatial coordinates
 
         """
         if not stream:
             raise ValueError("No stream provided")
 
+        #TODO Refactor into function (e.g fetch)
         data_dict = stream.get_stream_data(max_points=self.limit)
         if not data_dict:
             print("No data available in stream")
@@ -180,10 +177,20 @@ class st_visualizer:
         except Exception as e:
             raise ValueError(f"Failed to convert stream data to DataFrame: {e}")
         
-        data = geom_helper.create_geometry(data, coordinate_columns=sp_columns, crs=crs)
-        self.__set_data(data, sp_columns)
+        #TODO: Refactor into process_bactch
+        data = geom_helper.create_geometry(data, coordinate_columns=self.sp_columns, source_crs=source_crs)
+        # batch_df = batch_df.to_crs(self.proj)
+        
+        #TODO: Callback : fetch -> process batch -> prepare data 
+        self.__set_data(data, self.sp_columns)
+        # self.prepare_data()
+        # batch_dict = self.data.drop(columns=[self.data.geometry.name]).to_dict(orient='list')
+        # self.source.stream(batch_dict, rollover=self.limit)
 
-    def create_stream_visualization(self, stream, sp_columns=['lon','lat'], crs='epsg:4326', suffix='_merc', refresh_rate=500):
+
+        #TODO: Periodic callback
+
+    def create_stream_visualization(self, stream, source_crs='epsg:4326', suffix='_merc', refresh_rate=500):
         """
         Initialize the streaming pipeline and update the Bokeh CDS.
         
@@ -191,9 +198,7 @@ class st_visualizer:
         ----------
         stream : object of abstract type ST_AbstractStream (kafka or any other data streaming technology)
             The stream instance. returns a columnar dictionary in orient='list' format.
-        sp_columns: List (default: ```['lon', 'lat']```)
-            The (ordered) list of columns that contain the spatial coordinates
-        crs: str (default: ```'epsg:4326'```)  
+        source_crs: str (default: ```'epsg:4326'```)  
             The CRS of the Dataset's spatial coordinates
         suffix: str (default: ```'_merc'```)
             A suffix for the column name of the extracted spatial coordinates
@@ -205,7 +210,8 @@ class st_visualizer:
             raise ValueError("No stream provided")
         
         def process_batch(batch_df):
-            batch_df = geom_helper.create_geometry(batch_df, coordinate_columns=sp_columns, crs=crs)
+            batch_df = geom_helper.create_geometry(batch_df, coordinate_columns=self.sp_columns, source_crs=source_crs)
+            batch_df = batch_df.to_crs(self.proj)
             batch_df = self.prepare_data(batch_df, suffix=suffix)
             
             batch_dict = batch_df.drop(columns=[batch_df.geometry.name]).to_dict(orient='list')
@@ -213,9 +219,10 @@ class st_visualizer:
 
         # data boostrap if its the first call 
         if self.source is None:
-            first_batch = stream.get_stream_data(max_points=self.limit)
-            self.sp_columns = sp_columns
+            self.sp_columns = self.sp_columns
+            self.__suffix = suffix
 
+            first_batch = stream.get_stream_data(max_points=self.limit)
             if not first_batch:
                 logger.warning("No data available to bootstrap the source")
                 return
@@ -236,16 +243,19 @@ class st_visualizer:
                 batch_dict = process_batch(batch_df)
 
                 # Stream directly to the CDS
+                logger.info(f'Fetched {len(batch_dict)} records')
                 self.source.stream(batch_dict, rollover=self.limit)
 
             except Exception as e:
                 logger.error(f"Stream update failed: {e}")
-
-        bokeh_io.curdoc().add_periodic_callback(update_callback, refresh_rate)
+                
+        
+        #TODO: Might break at multiple instances. might need refactor
+        self.doc.add_periodic_callback(update_callback, refresh_rate)
         logger.info(f"Started periodic stream callback ({refresh_rate} ms)")
 
 
-    def get_data_csv(self, filepath, sp_columns=['lon', 'lat'], crs='epsg:4326', **kwargs):
+    def get_data_csv(self, filepath, source_crs='epsg:4326', **kwargs):
         """
         Parse a CSV file as a GeoDataFrame.
             
@@ -253,20 +263,18 @@ class st_visualizer:
         ----------
         filepath: str
             The path to the CSV source file
-        sp_columns: List (default: ```['lon', 'lat']```)
-            The (ordered) list of columns that contain the spatial coordinates
-        crs: str (default: ```'epsg:4326'```)  
+        source_crs: str (default: ```'epsg:4326'```)  
             The CRS of the Dataset's spatial coordinates
         **kwargs: Dict
             Other arguments related to parsing a CSV file (consult pandas.read_csv method)
         """
         data = pd.read_csv(filepath, **kwargs)
-        data = geom_helper.create_geometry(data, coordinate_columns=sp_columns, crs=crs)
+        data = geom_helper.create_geometry(data, coordinate_columns=self.sp_columns, source_crs=source_crs)
        
-        self.__set_data(data, sp_columns)
+        self.__set_data(data, self.sp_columns)
 
 
-    def get_data_postgres(self, sql, con, postgis=True, sp_columns=['lon', 'lat'], crs=None, **kwargs):
+    def get_data_postgres(self, sql, con, postgis=True, source_crs=None, **kwargs):
         """
         Parse a PostGIS SQL Result as a GeoDataFrame.
             
@@ -274,20 +282,18 @@ class st_visualizer:
         ----------
         sql: str
             The SQL query for fetching the spatial data.
-        sp_columns: List (default: ```['lon', 'lat']```)
-            The (ordered) list of columns that contain the spatial coordinates
-        crs: str (default: ```'epsg:4326'```)  
+        source_crs: str (default: ```'epsg:4326'```)  
             The CRS of the Dataset's spatial coordinates
         **kwargs: Dict
             Other arguments related to parsing the SQL Result (consult geopandas.read_postgis method)
         """
         if postgis:
-            data = gpd.read_postgis(sql, con, crs=crs, **kwargs)
+            data = gpd.read_postgis(sql, con, source_crs=source_crs, **kwargs)
         else:
             data = pd.read_sql_query(sql, con, **kwargs)
-            data = geom_helper.create_geometry(data, coordinate_columns=sp_columns, crs=crs)
+            data = geom_helper.create_geometry(data, coordinate_columns=self.sp_columns, source_crs=source_crs)
 
-        self.__set_data(data, sp_columns)
+        self.__set_data(data, self.sp_columns)
 
 
     def prepare_data(self, data=None, suffix=None):
@@ -371,27 +377,40 @@ class st_visualizer:
         **kwargs: Dict
             Other arguments related to creating the instance's Canvas (consult bokeh.plotting.figure method)
         """
-        if self.data is None:
-            logger.error('You must set a DataFrame first')
-            raise ValueError('No DataFrame set.')
+        if self.data is not None:
+            if self.limit < len(self.data):
+                title = f'{title} - Showing {self.limit} out of {len(self.data)} records'
+            bbox = self.data.total_bounds
+            if x_range is None:
+                x_range = (np.floor(bbox[0]), np.ceil(bbox[2]))
+            if y_range is None:
+                y_range = (np.floor(bbox[1]), np.ceil(bbox[3]))
+
+        elif self.source is not None and len(self.source.data) > 0:
+            try:
+                x = np.array(self.source.data.get(f'lon{suffix}', []))
+                y = np.array(self.source.data.get(f'lat{suffix}', []))
+                if len(x) > 0 and len(y) > 0:
+                    x_range = (np.nanmin(x), np.nanmax(x))
+                    y_range = (np.nanmin(y), np.nanmax(y))
+            except Exception as e:
+                logger.warning(f"Could not infer bounds from source: {e}")
+        else:
+            logger.error('No data has been set to the instance')
+            raise ValueError('No Data set (stream or static dataframe).')
         
-        if self.limit < len(self.data):
-            title = f'{title} - Showing {self.limit} out of {len(self.data)} records'
-
-        bbox = self.data.total_bounds
-        if x_range is None:
-            x_range=(np.floor(bbox[0]), np.ceil(bbox[2]))
-        if y_range is None:
-            y_range=(np.floor(bbox[1]), np.ceil(bbox[3]))
-
         fig = figure(x_range=x_range, y_range=y_range, x_axis_type="mercator", y_axis_type="mercator", title=title, **kwargs)
-        
-        self.set_figure(fig)   
-        
-        if self.source is None:
+        self.set_figure(fig)
+
+        try:
+            providers.add_tile_to_canvas(self, tile_provider=tile_provider, **tile_kwargs)
+            # logger.info(f"Tile provider '{tile_provider}' added successfully.")
+        except Exception as e:
+            logger.error(f"Failed to add tile provider: {e}")
+
+        if self.source is None and self.data is not None:
             self.create_source(suffix)
 
-        providers.add_tile_to_canvas(self, tile_provider=tile_provider, **tile_kwargs)
 
     def add_categorical_colormap(self, palette, categorical_name, **kwargs):
         """
@@ -517,7 +536,7 @@ class st_visualizer:
         if marker not in ALLOWED_BASIC_MARKERS:
             logger.error(f'❌ Invalid marker: "{marker}". Allowed markers are: {ALLOWED_BASIC_MARKERS}')
             raise ValueError(f'Invalid Marker')
-
+        
         coordinates = [f'{col}{self.__suffix}' for col in self.sp_columns]
 
         renderer = self.figure.scatter(
@@ -535,53 +554,6 @@ class st_visualizer:
         self.renderers.append(renderer)
 
         return renderer
-    
-    def add_marker_geojson(self, marker='circle', size=10, color='royalblue', sec_color='lightslategray', alpha=0.7, muted_alpha=0, **kwargs):
-        """
-        Add a Glyph to the Canvas using a GeoJSONDataSource.
-        
-        Parameters
-        ----------
-        glyph_type: str (default: ```'circle'```)
-            The Glyph's type
-        size: int (default: 10)
-            The Glyph's size
-        color: str or bokeh.colors instance (default: ```'royalblue'```)
-            The Glyph's primary color
-        sec_color: str or bokeh.colors instance (default: ```'lightslategray'```)
-            The Glyph's secondary color (i.e., the glyph's color when disselected).        
-        alpha:float (values in [0,1] -- default: ```0.7```)
-            The Glyph's overall alpha
-        muted_alpha:float (values in [0,1] -- default: ```0```)
-            The Glyph's alpha when disabled from the legend
-        **kwargs: Dict
-            Other arguments related to the creation of a Glyph
-        
-        Returns
-        -------
-        renderer: Bokeh glyph instance
-            The instance of the added glyph
-        """
-        if not isinstance(self.source, GeoJSONDataSource):
-            logger.error("Invalid Source Type")
-            raise ValueError("Source must be a GeoJSONDataSource")
-        
-        renderer = self.figure.scatter(
-            x="x",
-            y="y",
-            size=size,
-            marker=marker,
-            color=color,
-            nonselection_fill_color=sec_color,
-            alpha=alpha,
-            muted_alpha=muted_alpha,
-            source=self.source,
-            **kwargs
-        )
-
-        self.renderers.append(renderer)
-        return renderer
-    
 
     
     def add_line(self, line_type='multi_line', line_color="royalblue", line_width=5, alpha=0.7, muted_alpha=0, **kwargs):
