@@ -46,7 +46,7 @@ ALLOWED_NUMERICAL_COLOR_PALETTES = ['Blues256', 'Greens256', 'Greys256', 'Infern
 class st_visualizer:
 
 
-    def __init__(self, limit=30000, allow_complex_geometries=False, target_crs=3857, sp_columns=['lon', 'lat']):
+    def __init__(self, limit=30000, allow_complex_geometries=False, target_crs=3857, sp_columns=['lon', 'lat'], expected_schema: pa.schema= None ):
         """
         Constructor for creating a VISIONS Instance.
             
@@ -62,23 +62,23 @@ class st_visualizer:
         self.limit = limit
         self.allow_complex_geometries = allow_complex_geometries
         self.target_crs = target_crs
+        self.sp_columns = sp_columns
+        self.expected_schema = expected_schema
 
         self.data = None
         self.canvas_data = None
-        self.sp_columns = sp_columns
-        
         self.figure = None
         self.source = None
         self._bokeh_handle = None
 
         self.renderers = []
         self.widgets   = []
-
         self.cmap = None
         self.__suffix = None
         self.aquire_canvas_data = None 
-
         self._stream = None
+
+        logger.info(f"VISIONS instance initialized with limit={limit}, target_crs={target_crs}")
         # self._arrow_cache = None
         # self.doc = doc #TODO: Might break at multiple instances. might need refactor
     
@@ -265,16 +265,18 @@ class st_visualizer:
             if self.source is not None:
                 valid_cols = set(self.source.data.keys())
                 stream_dict = {k: v for k, v in stream_dict.items() if k in valid_cols}
-                self.source.stream(stream_dict, rollover=10)
+                self.source.stream(stream_dict, rollover=self.limit)
                 logger.info("Streamed batch")
             else:
                 logger.warning("No ColumnDataSource available yet — skipping stream.")
 
             if notebook:
                 try:
-                    bokeh_io.push_notebook(handle=self._bokeh_handle)
-                    logger.info('tried to push to notebook')
-                    logger.debug(stream_dict)
+                    # Only push if the handle exists
+                    if hasattr(self, "_bokeh_handle") and self._bokeh_handle is not None:
+                        bokeh_io.push_notebook(handle=self._bokeh_handle)
+                    else:
+                        logger.info("No notebook handle yet, skipping push")
                 except Exception as e:
                     logger.warning(f"Notebook update failed: {e}")
 
@@ -428,7 +430,7 @@ class st_visualizer:
         self.__suffix = suffix
 
     #TODO MOVE TO CONSTRUCTOR (maybe add as arrow schema)
-    def create_canvas(self, title, x_range=None, y_range=None, tile_provider='CARTODBPOSITRON', suffix='_merc',expected_columns=None, tile_kwargs={}, **kwargs):        
+    def create_canvas(self, title, x_range=None, y_range=None, tile_provider='CARTODBPOSITRON', suffix='_merc', tile_kwargs={}, **kwargs):        
         """
         Create the instance's Canvas and CDS.
 
@@ -470,7 +472,7 @@ class st_visualizer:
             except Exception as e:
                 logger.warning(f"Could not infer bounds from source: {e}")
 
-            # --- Default to empty map extent if nothing to show ---
+        # --- Default to empty map extent if nothing to show ---
         if x_range is None or y_range is None:
             x_range = (-2.003e7, 2.003e7)
             y_range = (-2.003e7, 2.003e7)
@@ -485,21 +487,25 @@ class st_visualizer:
         except Exception as e:
             logger.error(f"Failed to add tile provider: {e}")
 
+        
         if self.source is None:
             if self.data is not None:
                 self.create_source(suffix)
             else:
-            # Determine which columns to initialize
-                if expected_columns is not None:
-                    cds_columns = expected_columns
+                if self.expected_schema is not None:
+                    cds_columns = [field.name for field in self.expected_schema]
+                    logger.info(f"Using expected_schema for CDS: {cds_columns}")
+                    
                 else:
-                    cds_columns = [f'{col}{suffix}' for col in self.sp_columns]
+                    cds_columns = [f"{col}{suffix}" for col in self.sp_columns]
+                    logger.info(f"No schema found, using default spatial columns: {cds_columns}")
 
                 empty_dict = {col: [] for col in cds_columns}
                 self.source = ColumnDataSource(empty_dict)
                 self.__suffix = suffix
-                logger.info(f"Initialized empty ColumnDataSource with columns: {list(empty_dict.keys())}") 
-            
+                logger.info(f"Initialized empty ColumnDataSource with columns: {list(empty_dict.keys())}")
+                title = f'{title} - Showing {self.limit} out of {len(self.data)} records'
+                
 
 
     def add_categorical_colormap(self, palette, categorical_name, **kwargs):

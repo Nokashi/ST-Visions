@@ -20,9 +20,9 @@ def simulate_kafka_stream(
     topic="test_topic",
     bootstrap_servers="localhost:9092",
     key_field=None,
-    delay=0.1
+    delay=0.001
 ):
-    df = pd.read_csv(csv_path).head(1000)
+    df = pd.read_csv(csv_path).head(20000)
     print(f"Loaded CSV: {len(df)} rows. Streaming to '{topic}'...")
 
     producer = KafkaProducer(
