@@ -77,6 +77,7 @@ class st_visualizer:
         self.__suffix = None
         self.aquire_canvas_data = None 
         self._stream = None
+        self.is_centered_on_data = False
 
         logger.info(f"VISIONS instance initialized with limit={limit}, target_crs={target_crs}")
         # self._arrow_cache = None
@@ -223,7 +224,6 @@ class st_visualizer:
                 else:
                     combined = batch_table
 
-                # rolling window limit
                 if combined.num_rows > self.limit:
                     start = combined.num_rows - self.limit
                     combined = combined.slice(start)
@@ -270,6 +270,18 @@ class st_visualizer:
             else:
                 logger.warning("No ColumnDataSource available yet — skipping stream.")
 
+            if not self.is_centered_on_data and len(processed_batch) > 0:
+                x_min, x_max = processed_batch[f'lon{self.__suffix}'].min(), processed_batch[f'lon{self.__suffix}'].max()
+                y_min, y_max = processed_batch[f'lat{self.__suffix}'].min(), processed_batch[f'lat{self.__suffix}'].max()
+
+                self.figure.x_range.start = x_min
+                self.figure.x_range.end = x_max
+                self.figure.y_range.start = y_min
+                self.figure.y_range.end = y_max
+
+                self.is_centered_on_data = True
+                logger.info(f"dynamically bounded to first batch data: X({x_min},{x_max}) Y({y_min},{y_max})")
+
             if notebook:
                 try:
                     # Only push if the handle exists
@@ -279,22 +291,6 @@ class st_visualizer:
                         logger.info("No notebook handle yet, skipping push")
                 except Exception as e:
                     logger.warning(f"Notebook update failed: {e}")
-
-        # boostrap\
-        #TODO: Might be removed, investigate 
-        initial_batch = fetch_data()
-        logger.info('batch received')
-        if initial_batch is not None:
-            append_to_cache(initial_batch)
-
-            init_df = initial_batch.to_pandas()
-            processed = process_batch(init_df)
-            
-            self.__set_data(processed, self.sp_columns)
-            self.prepare_data()
-            logger.info('Initial Data bootstrapped')
-        else:
-            logger.info("No initial data, waiting to receive stream data")
 
         if notebook:
             def notebook_periodic_callback():
@@ -429,7 +425,6 @@ class st_visualizer:
         self.set_source(source)
         self.__suffix = suffix
 
-    #TODO MOVE TO CONSTRUCTOR (maybe add as arrow schema)
     def create_canvas(self, title, x_range=None, y_range=None, tile_provider='CARTODBPOSITRON', suffix='_merc', tile_kwargs={}, **kwargs):        
         """
         Create the instance's Canvas and CDS.
@@ -489,6 +484,7 @@ class st_visualizer:
 
         
         if self.source is None:
+            title = f'{title} - Showing Data Streaming Records'
             if self.data is not None:
                 self.create_source(suffix)
             else:
@@ -504,7 +500,7 @@ class st_visualizer:
                 self.source = ColumnDataSource(empty_dict)
                 self.__suffix = suffix
                 logger.info(f"Initialized empty ColumnDataSource with columns: {list(empty_dict.keys())}")
-                title = f'{title} - Showing {self.limit} out of {len(self.data)} records'
+                
                 
 
 
@@ -630,7 +626,7 @@ class st_visualizer:
             The instance of the added glyph
         """
         if marker not in ALLOWED_BASIC_MARKERS:
-            logger.error(f'❌ Invalid marker: "{marker}". Allowed markers are: {ALLOWED_BASIC_MARKERS}')
+            logger.error(f'Invalid marker: "{marker}". Allowed markers are: {ALLOWED_BASIC_MARKERS}')
             raise ValueError(f'Invalid Marker')
         
         coordinates = [f'{col}{self.__suffix}' for col in self.sp_columns]
@@ -677,7 +673,7 @@ class st_visualizer:
             The instance of the added PolyLine
         """
         if line_type not in ALLOWED_BASIC_LINE_TYPES:
-            logger.error(f'❌ Invalid line_type: "{line_type}". Allowed types are: {ALLOWED_BASIC_LINE_TYPES}')
+            logger.error(f'Invalid line_type: "{line_type}". Allowed types are: {ALLOWED_BASIC_LINE_TYPES}')
             raise ValueError(f'Invalid line type.')
 
         coordinates = [f'{col}{self.__suffix}' for col in self.sp_columns]
@@ -724,7 +720,7 @@ class st_visualizer:
             The instance of the added polygon
         """
         if polygon_type not in ALLOWED_BASIC_POLYGON_TYPES:
-            logger.error(f'❌ Invalid line_type: "{polygon_type}". Allowed types are: {ALLOWED_BASIC_POLYGON_TYPES}')
+            logger.error(f'Invalid line_type: "{polygon_type}". Allowed types are: {ALLOWED_BASIC_POLYGON_TYPES}')
             raise ValueError(f'Invalid Line Type')
 
         coordinates = [f'{col}{self.__suffix}' for col in self.sp_columns]
@@ -1006,7 +1002,7 @@ class st_visualizer:
         return grid
 
 
-    def show_figures(self, figures=None, sizing_mode=None, toolbar_location='above', ncols=None, width=None, height=None, toolbar_options=None, merge_tools=True, notebook=True, stream=False, doc=None, notebook_url='http://localhost:8888', **kwargs):
+    def show_figures(self, figures=None, sizing_mode=None, toolbar_location='above', ncols=None, width=None, height=None, toolbar_options=None, merge_tools=True, notebook=True, doc=None, notebook_url='http://localhost:8888', **kwargs):
         """
         Render a Bokeh grid layout either in a Jupyter notebook or a Bokeh server.
             
