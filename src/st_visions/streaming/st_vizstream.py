@@ -38,7 +38,7 @@ class ST_AbstractStream(ABC):
         """
         pass
     @abstractmethod
-    def get_stream_data(self, max_points):
+    def fetch_data(self, max_points):
         pass
 
 
@@ -149,7 +149,7 @@ class ST_KafkaStream(ST_AbstractStream):
         print(f"---------------------------------")
         print(f"Listening to topic '{self.topic}'...")
 
-    def get_stream_data(self, max_points=500):
+    def fetch_data(self, max_points=500):
         """
         Drain the queue and return all records as a columnar dict (orient='list') up until max_points
         """

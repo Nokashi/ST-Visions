@@ -14,6 +14,7 @@ from loguru import logger
 import itertools
 from itertools import islice
 import pyarrow as pa 
+import threading, time
 
 import bokeh
 import bokeh.io as bokeh_io
@@ -45,7 +46,7 @@ ALLOWED_NUMERICAL_COLOR_PALETTES = ['Blues256', 'Greens256', 'Greys256', 'Infern
 class st_visualizer:
 
 
-    def __init__(self, limit=30000, allow_complex_geometries=False, target_crs='epsg:3857', doc = None, sp_columns=['lon', 'lat']):
+    def __init__(self, limit=30000, allow_complex_geometries=False, target_crs=3857, sp_columns=['lon', 'lat']):
         """
         Constructor for creating a VISIONS Instance.
             
@@ -55,12 +56,12 @@ class st_visualizer:
             The maximum number of geometries (glyphs/polygons/lines) to be visualized.
         allow_complex_geometries: boolean (default: False)
             Choose to plot either the polygons' exterior (False) or along with its inner voids (True)
-        target_crs: str (default: ```'epsg:3857'```)
+        target_crs: int (default: ```3857```)
             The target crs that the input geometries will be projected to prior to visualization.
         """
         self.limit = limit
         self.allow_complex_geometries = allow_complex_geometries
-        self.proj = target_crs
+        self.target_crs = target_crs
 
         self.data = None
         self.canvas_data = None
@@ -68,6 +69,7 @@ class st_visualizer:
         
         self.figure = None
         self.source = None
+        self._bokeh_handle = None
 
         self.renderers = []
         self.widgets   = []
@@ -77,7 +79,8 @@ class st_visualizer:
         self.aquire_canvas_data = None 
 
         self._stream = None
-        self.doc = doc #TODO: Might break at multiple instances. might need refactor
+        # self._arrow_cache = None
+        # self.doc = doc #TODO: Might break at multiple instances. might need refactor
     
 
     def __set_data(self, data, columns):
@@ -91,13 +94,13 @@ class st_visualizer:
         columns: List 
             The (ordered) column names for the location of the spatial coordinates.
         """
-        data = data.to_crs(self.proj)
+        data = data.to_crs(self.target_crs)
 
         self.data = data
         self.sp_columns = columns
 
     #TODO: conditional for streaming support (is instance etc etc etc)
-    def set_data(self, data, source_crs='epsg:4326'):
+    def set_data(self, data, source_crs=4326):
         """
         Loading a Dataset to a VISIONS instance.
             
@@ -105,13 +108,28 @@ class st_visualizer:
         ----------
         data: Pandas DataFrame or GeoPandas GeoDataFrame
             The Dataset that will be loaded to the instance
-        source_crs: str (default: ```'epsg:4326'```) 
+        source_crs: int (default: ```4326```) 
             The CRS of the Dataset's spatial coordinates
         """
         if isinstance(data, dict):
             try:
                 table = pa.table(data)
-                data = table.to_pandas()
+                # data = table.to_pandas()
+                try:
+                    current_data = pa.Table.from_pandas(
+                    self.data.drop(columns=[self.data.geometry.name]),
+                    preserve_index=False
+                    )
+
+                    combined_table = pa.concat_tables([table, current_data], promote_options='default')
+                    if combined_table.num_rows > self.limit:
+                        start = combined_table.num_rows - self.limit
+                        combined_table = combined_table.slice(start)
+
+                    data = combined_table.to_pandas()
+                except Exception as e:
+                    logger.warning(f"Arrow concatenation failed, replacing data: {e}")
+                    data = table.to_pandas()
             except Exception as e:
                 logger.error(f'Cant convert the streaming data to a dataframe')
                 raise ValueError(f"Failed to convert streaming data to DataFrame: {e}")
@@ -150,112 +168,168 @@ class st_visualizer:
         """
         self.source = source
 
-    def get_data_stream(self, stream, source_crs='epsg:4326'):
+    def get_data_stream(self, stream, source_crs=4326, refresh_rate=1000, notebook = False):
         """
-        Consume Data from a streaming source and parse it as a GeoDataFrame
+        Consume data from a streaming source and periodically update the visualization.
+
+        Uses an Arrow table cache for efficient append operations.
 
         Parameters
         ----------
-        stream : object of abstract type ST_AbstractStream (kafka or any other data streaming technology)
-            The stream instance. returns a columnar dictionary in orient='list' format.
-        source_crs: str (default: ```'epsg:4326'```)  
-            The CRS of the Dataset's spatial coordinates
-
-        """
-        if not stream:
-            raise ValueError("No stream provided")
-
-        #TODO Refactor into function (e.g fetch)
-        data_dict = stream.get_stream_data(max_points=self.limit)
-        if not data_dict:
-            print("No data available in stream")
-            return None
-
-        try:
-            table = pa.table(data_dict)
-            data = table.to_pandas()
-        except Exception as e:
-            raise ValueError(f"Failed to convert stream data to DataFrame: {e}")
-        
-        #TODO: Refactor into process_bactch
-        data = geom_helper.create_geometry(data, coordinate_columns=self.sp_columns, source_crs=source_crs)
-        # batch_df = batch_df.to_crs(self.proj)
-        
-        #TODO: Callback : fetch -> process batch -> prepare data 
-        self.__set_data(data, self.sp_columns)
-        # self.prepare_data()
-        # batch_dict = self.data.drop(columns=[self.data.geometry.name]).to_dict(orient='list')
-        # self.source.stream(batch_dict, rollover=self.limit)
-
-
-        #TODO: Periodic callback
-
-    def create_stream_visualization(self, stream, source_crs='epsg:4326', suffix='_merc', refresh_rate=500):
-        """
-        Initialize the streaming pipeline and update the Bokeh CDS.
-        
-        Parameters
-        ----------
-        stream : object of abstract type ST_AbstractStream (kafka or any other data streaming technology)
-            The stream instance. returns a columnar dictionary in orient='list' format.
-        source_crs: str (default: ```'epsg:4326'```)  
-            The CRS of the Dataset's spatial coordinates
-        suffix: str (default: ```'_merc'```)
-            A suffix for the column name of the extracted spatial coordinates
-        refresh_rate : int (default: ```500```)
-            Milliseconds between periodic updates.
+        stream : ST_AbstractStream
+            Streaming source instance (Kafka, etc.)
+        source_crs : int
+            Coordinate reference system of the incoming data (default: 4326).
+        refresh_rate : int
+            Update frequency in milliseconds (default: 1000 ms = 1 second)
         """
 
         if not stream:
             raise ValueError("No stream provided")
-        
-        def process_batch(batch_df):
-            batch_df = geom_helper.create_geometry(batch_df, coordinate_columns=self.sp_columns, source_crs=source_crs)
-            batch_df = batch_df.to_crs(self.proj)
-            batch_df = self.prepare_data(batch_df, suffix=suffix)
-            
-            batch_dict = batch_df.drop(columns=[batch_df.geometry.name]).to_dict(orient='list')
-            return batch_dict
 
-        # data boostrap if its the first call 
-        if self.source is None:
-            self.sp_columns = self.sp_columns
-            self.__suffix = suffix
+        # Initialize Arrow cache if not present
+        # TODO: probably move to constructor if this the way to go?
+        if not hasattr(self, "_arrow_cache"):
+            self._arrow_cache = None
 
-            first_batch = stream.get_stream_data(max_points=self.limit)
-            if not first_batch:
-                logger.warning("No data available to bootstrap the source")
-                return
+        # not on constructor cause im not sure if its the correct way to deal with this 
+        if not hasattr(self, "_stop_callback"):
+            self._stop_callback = threading.Event()
+        else:
+            # Stop any existing stream before starting a new one
+            if not self._stop_callback.is_set():
+                logger.info("Existing stream detected, stopping previous one...")
+                self.stop_callback()
+                time.sleep(0.5)
+            self._stop_callback = threading.Event()
 
-            first_df = pa.table(first_batch).to_pandas()
-            first_dict = process_batch(first_df)
-            self.source = ColumnDataSource(first_dict)
-            logger.info("Bootstrapped CDS with initial data")
+        def fetch_data():
+            """Fetch latest data batch as a PyArrow Table."""
+            data_dict = stream.fetch_data(max_points=self.limit)
+            if not data_dict:
+                return None
 
-        # bokeh periodic update 
-        def update_callback():
             try:
-                batch = stream.get_stream_data(max_points=self.limit)
-                if not batch:
-                    return
+                batch_table = pa.table(data_dict)
+                return batch_table
+            except Exception as e:
+                logger.warning(f"Failed to convert stream data to Arrow Table: {e}")
+                return None
 
-                batch_df = pa.table(batch).to_pandas()
-                batch_dict = process_batch(batch_df)
+        def append_to_cache(batch_table):
+            try:
+                if self._arrow_cache is not None:
+                    combined = pa.concat_tables([self._arrow_cache, batch_table], promote_options='default')
+                else:
+                    combined = batch_table
 
-                # Stream directly to the CDS
-                logger.info(f'Fetched {len(batch_dict)} records')
-                self.source.stream(batch_dict, rollover=self.limit)
+                # rolling window limit
+                if combined.num_rows > self.limit:
+                    start = combined.num_rows - self.limit
+                    combined = combined.slice(start)
+
+                self._arrow_cache = combined
+                return combined
 
             except Exception as e:
-                logger.error(f"Stream update failed: {e}")
-                
-        
-        #TODO: Might break at multiple instances. might need refactor
-        self.doc.add_periodic_callback(update_callback, refresh_rate)
-        logger.info(f"Started periodic stream callback ({refresh_rate} ms)")
+                logger.warning(f"Arrow append failed, resetting cache: {e}")
+                self._arrow_cache = batch_table
+                return batch_table
 
+        def process_batch(df):
+            gdf = geom_helper.create_geometry(df, coordinate_columns=self.sp_columns, source_crs=source_crs)
+            gdf = gdf.to_crs(self.target_crs)
+    
+            gdf[f"lon{self.__suffix}"] = gdf.geometry.x
+            gdf[f"lat{self.__suffix}"] = gdf.geometry.y
+            return gdf
 
-    def get_data_csv(self, filepath, source_crs='epsg:4326', **kwargs):
+        #TODO: Add bounding box focusing on first data streaming.
+        def st_stream_callback():
+            batch_table = fetch_data()
+            if batch_table is None:
+                return
+
+            combined_table = append_to_cache(batch_table)
+            batch_df = batch_table.to_pandas()
+            data_df = combined_table.to_pandas()
+
+            processed_batch = process_batch(batch_df)
+            updated_data = process_batch(data_df)
+
+            self.__set_data(updated_data, self.sp_columns)
+            self.prepare_data()
+
+            stream_dict = processed_batch.drop(columns=[processed_batch.geometry.name]).to_dict(orient="list")
+
+            if self.source is not None:
+                valid_cols = set(self.source.data.keys())
+                stream_dict = {k: v for k, v in stream_dict.items() if k in valid_cols}
+                self.source.stream(stream_dict, rollover=10)
+                logger.info("Streamed batch")
+            else:
+                logger.warning("No ColumnDataSource available yet — skipping stream.")
+
+            if notebook:
+                try:
+                    bokeh_io.push_notebook(handle=self._bokeh_handle)
+                    logger.info('tried to push to notebook')
+                    logger.debug(stream_dict)
+                except Exception as e:
+                    logger.warning(f"Notebook update failed: {e}")
+
+        # boostrap\
+        #TODO: Might be removed, investigate 
+        initial_batch = fetch_data()
+        logger.info('batch received')
+        if initial_batch is not None:
+            append_to_cache(initial_batch)
+
+            init_df = initial_batch.to_pandas()
+            processed = process_batch(init_df)
+            
+            self.__set_data(processed, self.sp_columns)
+            self.prepare_data()
+            logger.info('Initial Data bootstrapped')
+        else:
+            logger.info("No initial data, waiting to receive stream data")
+
+        if notebook:
+            def notebook_periodic_callback():
+                while not self._stop_callback.is_set():
+                    try:
+                        st_stream_callback()
+                        time.sleep(refresh_rate / 1000)
+                    except Exception as e:
+                        logger.error(f"Notebook streaming error: {e}")
+                        break
+                logger.info("Notebook thread stopped")
+
+            thread = threading.Thread(target=notebook_periodic_callback, daemon=True)
+            thread.start()
+            self._notebook_thread = thread
+            logger.info("Notebook thread started")
+        else:
+            # Server mode
+            doc = bokeh_io.curdoc()
+            doc.add_periodic_callback(st_stream_callback, refresh_rate)
+            logger.info("Bokeh periodic callback registered")
+
+### HELPER THREAD CONTROL FUNCTION
+
+    def stop_callback(self):
+        """Gracefully stop notebook streaming thread."""
+        import time
+        if hasattr(self, "_stop_callback"):
+            self._stop_callback.set()
+            print("Stopping notebook stream...")
+            time.sleep(0.5)
+        else:
+            print("No active notebook stream to stop.")
+
+### NOT SURE IF SHOULD BE KEPT 
+
+    def get_data_csv(self, filepath, source_crs=4326, **kwargs):
         """
         Parse a CSV file as a GeoDataFrame.
             
@@ -263,7 +337,7 @@ class st_visualizer:
         ----------
         filepath: str
             The path to the CSV source file
-        source_crs: str (default: ```'epsg:4326'```)  
+        source_crs: int (default: ```4326```)  
             The CRS of the Dataset's spatial coordinates
         **kwargs: Dict
             Other arguments related to parsing a CSV file (consult pandas.read_csv method)
@@ -274,7 +348,7 @@ class st_visualizer:
         self.__set_data(data, self.sp_columns)
 
 
-    def get_data_postgres(self, sql, con, postgis=True, source_crs=None, **kwargs):
+    def get_data_postgres(self, sql, con, postgis=True, source_crs=4326, **kwargs):
         """
         Parse a PostGIS SQL Result as a GeoDataFrame.
             
@@ -282,7 +356,7 @@ class st_visualizer:
         ----------
         sql: str
             The SQL query for fetching the spatial data.
-        source_crs: str (default: ```'epsg:4326'```)  
+        source_crs: int (default: ```4326```)  
             The CRS of the Dataset's spatial coordinates
         **kwargs: Dict
             Other arguments related to parsing the SQL Result (consult geopandas.read_postgis method)
@@ -353,8 +427,8 @@ class st_visualizer:
         self.set_source(source)
         self.__suffix = suffix
 
-
-    def create_canvas(self, title, x_range=None, y_range=None, tile_provider='CARTODBPOSITRON', suffix='_merc', tile_kwargs={}, **kwargs):        
+    #TODO MOVE TO CONSTRUCTOR (maybe add as arrow schema)
+    def create_canvas(self, title, x_range=None, y_range=None, tile_provider='CARTODBPOSITRON', suffix='_merc',expected_columns=None, tile_kwargs={}, **kwargs):        
         """
         Create the instance's Canvas and CDS.
 
@@ -395,9 +469,12 @@ class st_visualizer:
                     y_range = (np.nanmin(y), np.nanmax(y))
             except Exception as e:
                 logger.warning(f"Could not infer bounds from source: {e}")
-        else:
-            logger.error('No data has been set to the instance')
-            raise ValueError('No Data set (stream or static dataframe).')
+
+            # --- Default to empty map extent if nothing to show ---
+        if x_range is None or y_range is None:
+            x_range = (-2.003e7, 2.003e7)
+            y_range = (-2.003e7, 2.003e7)
+            logger.info("No data found — created empty canvas")
         
         fig = figure(x_range=x_range, y_range=y_range, x_axis_type="mercator", y_axis_type="mercator", title=title, **kwargs)
         self.set_figure(fig)
@@ -408,8 +485,21 @@ class st_visualizer:
         except Exception as e:
             logger.error(f"Failed to add tile provider: {e}")
 
-        if self.source is None and self.data is not None:
-            self.create_source(suffix)
+        if self.source is None:
+            if self.data is not None:
+                self.create_source(suffix)
+            else:
+            # Determine which columns to initialize
+                if expected_columns is not None:
+                    cds_columns = expected_columns
+                else:
+                    cds_columns = [f'{col}{suffix}' for col in self.sp_columns]
+
+                empty_dict = {col: [] for col in cds_columns}
+                self.source = ColumnDataSource(empty_dict)
+                self.__suffix = suffix
+                logger.info(f"Initialized empty ColumnDataSource with columns: {list(empty_dict.keys())}") 
+            
 
 
     def add_categorical_colormap(self, palette, categorical_name, **kwargs):
@@ -910,7 +1000,7 @@ class st_visualizer:
         return grid
 
 
-    def show_figures(self, figures=None, sizing_mode=None, toolbar_location='above', ncols=None, width=None, height=None, toolbar_options=None, merge_tools=True, notebook=True, doc=None, notebook_url='http://localhost:8888', **kwargs):
+    def show_figures(self, figures=None, sizing_mode=None, toolbar_location='above', ncols=None, width=None, height=None, toolbar_options=None, merge_tools=True, notebook=True, stream=False, doc=None, notebook_url='http://localhost:8888', **kwargs):
         """
         Render a Bokeh grid layout either in a Jupyter notebook or a Bokeh server.
             
@@ -948,9 +1038,16 @@ class st_visualizer:
         def bokeh_app(doc):
             doc.add_root(grid)
 
-        if notebook: 
+        if notebook:
             reset_output()
             output_notebook(**kwargs)
-            show(bokeh_app, notebook_url=notebook_url)
+
+            self._bokeh_handle = show(
+                grid,
+                notebook_handle=True,
+                notebook_url=notebook_url
+            )
+            
+            print("Live notebook handle created, use push_notebook() to stream updates.")
         else:
             bokeh_app(bokeh_io.curdoc() if doc is None else doc)

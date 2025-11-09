@@ -202,7 +202,7 @@ def create_linestring_from_points(gdf, column_handlers, **kwargs):
     return linestrings
 
 
-def create_geometry(df, coordinate_columns=['lon', 'lat'], crs=4326):
+def create_geometry(df, coordinate_columns=['lon', 'lat'], source_crs=4326):
     """
     Create a GeoDataFrame from a DataFrame in a much more generalized form.
     """
@@ -213,7 +213,7 @@ def create_geometry(df, coordinate_columns=['lon', 'lat'], crs=4326):
                 df[col] for col in coordinate_columns
             ]
         ),
-        crs=crs
+        crs=source_crs
     )
 
 
