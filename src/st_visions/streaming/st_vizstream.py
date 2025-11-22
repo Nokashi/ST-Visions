@@ -9,6 +9,7 @@ import time
 import json
 from abc import ABC, abstractmethod
 from queue import Queue
+from loguru import logger
 
 from kafka import KafkaConsumer
 from kafka.admin import KafkaAdminClient, NewTopic
@@ -49,7 +50,7 @@ class ST_AbstractStream(ABC):
         try:
             self._connect()
         except Exception as e:
-            print(f"[STREAM ERROR] Failed to connect: {e}")
+            logger.info(f"[STREAM ERROR] Failed to connect: {e}")
             return 
 
         try:
@@ -57,7 +58,7 @@ class ST_AbstractStream(ABC):
                 self._poll_data()
                 time.sleep(0.05)
         except Exception as e:
-            print(f"[STREAM ERROR] {e}")
+            logger.info(f"[STREAM ERROR] {e}")
         finally:
             self._close()
 
@@ -68,25 +69,25 @@ class ST_AbstractStream(ABC):
         
         """
         if self._thread and self._thread.is_alive():
-            print("Stream already running.")
+            logger.info("Stream already running.")
             return
 
         self._stop = False
         self._thread = threading.Thread(target=self._consume_loop, daemon=True)
         self._thread.start()
-        print("Stream thread initialized")
+        logger.info("Stream thread initialized")
 
     def stop(self):
         """
         Stop background thread
         
         """
-        print("Stopping stream...")
+        logger.info("Stopping stream...")
         self._stop = True
         if self._thread:
             self._thread.join(timeout=5)
             self._thread = None
-        print("Stream stopped")
+        logger.info("Stream stopped")
 
     def _close(self):
         """
@@ -124,11 +125,11 @@ class ST_KafkaStream(ST_AbstractStream):
         existing = admin.list_topics()
 
         if self.topic not in existing:
-            print(f"Creating topic '{self.topic}'...")
+            logger.info(f"Creating topic '{self.topic}'...")
             new_topic = NewTopic(name=self.topic, num_partitions=1, replication_factor=1)
             admin.create_topics(new_topics=[new_topic])
         else:
-            print(f"Topic '{self.topic}' exists.")
+            logger.info(f"Topic '{self.topic}' exists.")
         admin.close()
 
     def _connect(self):
@@ -145,9 +146,7 @@ class ST_KafkaStream(ST_AbstractStream):
             key_deserializer=lambda k: k.decode() if k else None,
             value_deserializer=lambda v: json.loads(v.decode('utf-8')),
         )
-        print(f"Connected to stream successfully!")
-        print(f"---------------------------------")
-        print(f"Listening to topic '{self.topic}'...")
+        logger.info(f"Connected to stream successfully! Listening to '{self.topic}'")
 
     def fetch_data(self, max_points=500):
         """

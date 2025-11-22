@@ -266,7 +266,7 @@ class st_visualizer:
                 valid_cols = set(self.source.data.keys())
                 stream_dict = {k: v for k, v in stream_dict.items() if k in valid_cols}
                 self.source.stream(stream_dict, rollover=self.limit)
-                logger.info("Streamed batch")
+                # logger.info("Streamed batch")
             else:
                 logger.warning("No ColumnDataSource available yet — skipping stream.")
 
@@ -280,15 +280,16 @@ class st_visualizer:
                 self.figure.y_range.end = y_max
 
                 self.is_centered_on_data = True
-                logger.info(f"dynamically bounded to first batch data: X({x_min},{x_max}) Y({y_min},{y_max})")
+                # logger.info(f"dynamically bounded to first batch data: X({x_min},{x_max}) Y({y_min},{y_max})")
+                
 
             if notebook:
                 try:
                     # Only push if the handle exists
                     if hasattr(self, "_bokeh_handle") and self._bokeh_handle is not None:
                         bokeh_io.push_notebook(handle=self._bokeh_handle)
-                    else:
-                        logger.info("No notebook handle yet, skipping push")
+                    # else:
+                       # logger.info("No notebook handle yet, skipping push")
                 except Exception as e:
                     logger.warning(f"Notebook update failed: {e}")
 
@@ -473,7 +474,7 @@ class st_visualizer:
             y_range = (-2.003e7, 2.003e7)
             logger.info("No data found — created empty canvas")
         
-        fig = figure(x_range=x_range, y_range=y_range, x_axis_type="mercator", y_axis_type="mercator", title=title, **kwargs)
+        fig = figure(x_range=x_range, y_range=y_range, x_axis_type="mercator", y_axis_type="mercator", title=title, match_aspect=True, aspect_ratio=4/3, **kwargs)
         self.set_figure(fig)
 
         try:
