@@ -274,6 +274,25 @@ class st_visualizer:
                 x_min, x_max = processed_batch[f'lon{self.__suffix}'].min(), processed_batch[f'lon{self.__suffix}'].max()
                 y_min, y_max = processed_batch[f'lat{self.__suffix}'].min(), processed_batch[f'lat{self.__suffix}'].max()
 
+                x_span = x_max - x_min
+                y_span = y_max - y_min
+
+                # get aspect ratio of plot
+                fig_aspect = self.figure.width / self.figure.height
+                data_aspect_ratio = x_span / y_span
+
+                # Expand y_range or x_range depending on aspect ratio
+                if data_aspect_ratio > fig_aspect:
+                    new_y_span = x_span / fig_aspect
+                    padding = (new_y_span - y_span) / 2
+                    y_min -= padding
+                    y_max += padding
+                else:
+                    new_x_span = y_span * fig_aspect
+                    padding = (new_x_span - x_span) / 2
+                    x_min -= padding
+                    x_max += padding
+
                 self.figure.x_range.start = x_min
                 self.figure.x_range.end = x_max
                 self.figure.y_range.start = y_min
@@ -490,7 +509,17 @@ class st_visualizer:
                 self.create_source(suffix)
             else:
                 if self.expected_schema is not None:
-                    cds_columns = [field.name for field in self.expected_schema]
+                    cds_columns = []
+
+                    for field in self.expected_schema:
+                        col = field.name
+
+                        if col in self.sp_columns:
+                            cds_columns.append(f'{col}{suffix}')
+                        else:
+                            cds_columns.append(col)
+                            
+                    # cds_columns = [field.name for field in self.expected_schema]
                     logger.info(f"Using expected_schema for CDS: {cds_columns}")
                     
                 else:
