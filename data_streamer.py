@@ -3,6 +3,8 @@ from kafka import KafkaProducer
 import json
 import pandas as pd
 from loguru import logger
+from src.st_visions.config.load_env import load_environment
+env = load_environment()
 
 
 def simulate_kafka_stream(
@@ -32,4 +34,4 @@ def simulate_kafka_stream(
 
 
 if __name__ == "__main__":
-    simulate_kafka_stream(r'data\unipi_ais_dynamic_2017\unipi_ais_dynamic_dec2017.csv', 'st-viz-topic')
+    simulate_kafka_stream(env['SARONIC_GULF_AIS'], 'st-viz-topic')

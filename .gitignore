@@ -10,3 +10,4 @@ ST_VisionsEnv
 data
 .venv
 doc/report
+.env

@@ -45,7 +45,7 @@ def plot_points_on_map(obj, tools=None, tile_provider='CARTODBPOSITRON', marker=
     basic_tools = "pan,box_zoom,wheel_zoom,save,reset" 
     extra_tools = f'{basic_tools},{",".join(tools)}' if tools is not None else basic_tools
         
-    obj.create_canvas(title=f'Prototype Plot', tile_provider=tile_provider, sizing_mode=sizing_mode, height=540, tools=extra_tools, **tile_kwargs, **kwargs)
+    obj.create_canvas(title=f'Express Plot', tile_provider=tile_provider, sizing_mode=sizing_mode, height=800, tools=extra_tools, **tile_kwargs, **kwargs)
 
     _ = obj.add_marker(marker=marker, size=size, color=color, alpha=alpha, fill_alpha=fill_alpha, muted_alpha=muted_alpha, legend_label=legend_label)
     obj.figure.toolbar.active_scroll = obj.figure.select_one(bokeh_models.WheelZoomTool)

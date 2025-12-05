@@ -8,5 +8,5 @@ PyYAML
 pyarrow
 kafka-python
 loguru
-
+python-dotenv
 

@@ -12,6 +12,9 @@ import bokeh.models as bokeh_mdl
 class BokehFilters:
     __metaclass__ = abc.ABCMeta
 
+    #TODO: add isempty assertion for empty data/CDS
+
+    
     def __init__(self, vsn_instance, widget):
         '''
         Constructor for the BokehFilters Class.

@@ -78,6 +78,7 @@ class st_visualizer:
         self.aquire_canvas_data = None 
         self._stream = None
         self.is_centered_on_data = False
+        self.padding = None
 
         logger.info(f"VISIONS instance initialized with limit={limit}, target_crs={target_crs}")
         # self._arrow_cache = None
@@ -265,14 +266,18 @@ class st_visualizer:
             if self.source is not None:
                 valid_cols = set(self.source.data.keys())
                 stream_dict = {k: v for k, v in stream_dict.items() if k in valid_cols}
+                #TODO: Check interaction with a filter
                 self.source.stream(stream_dict, rollover=self.limit)
                 # logger.info("Streamed batch")
             else:
                 logger.warning("No ColumnDataSource available yet — skipping stream.")
 
             if not self.is_centered_on_data and len(processed_batch) > 0:
-                x_min, x_max = processed_batch[f'lon{self.__suffix}'].min(), processed_batch[f'lon{self.__suffix}'].max()
-                y_min, y_max = processed_batch[f'lat{self.__suffix}'].min(), processed_batch[f'lat{self.__suffix}'].max()
+                bbox = self.data.total_bounds
+                x_min, y_min, x_max, y_max = bbox
+
+                #x_min, x_max = processed_batch[f'lon{self.__suffix}'].min(), processed_batch[f'lon{self.__suffix}'].max()
+                #y_min, y_max = processed_batch[f'lat{self.__suffix}'].min(), processed_batch[f'lat{self.__suffix}'].max()
 
                 x_span = x_max - x_min
                 y_span = y_max - y_min
@@ -282,6 +287,7 @@ class st_visualizer:
                 data_aspect_ratio = x_span / y_span
 
                 # Expand y_range or x_range depending on aspect ratio
+                #TODO 
                 if data_aspect_ratio > fig_aspect:
                     new_y_span = x_span / fig_aspect
                     padding = (new_y_span - y_span) / 2
@@ -293,10 +299,12 @@ class st_visualizer:
                     x_min -= padding
                     x_max += padding
 
-                self.figure.x_range.start = x_min
-                self.figure.x_range.end = x_max
-                self.figure.y_range.start = y_min
-                self.figure.y_range.end = y_max
+
+
+                self.figure.x_range.start = x_min 
+                self.figure.x_range.end = x_max 
+                self.figure.y_range.start = y_min 
+                self.figure.y_range.end = y_max 
 
                 self.is_centered_on_data = True
                 # logger.info(f"dynamically bounded to first batch data: X({x_min},{x_max}) Y({y_min},{y_max})")
@@ -332,20 +340,6 @@ class st_visualizer:
             doc = bokeh_io.curdoc()
             doc.add_periodic_callback(st_stream_callback, refresh_rate)
             logger.info("Bokeh periodic callback registered")
-
-### HELPER THREAD CONTROL FUNCTION
-
-    def stop_callback(self):
-        """Gracefully stop notebook streaming thread."""
-        import time
-        if hasattr(self, "_stop_callback"):
-            self._stop_callback.set()
-            print("Stopping notebook stream...")
-            time.sleep(0.5)
-        else:
-            print("No active notebook stream to stop.")
-
-### NOT SURE IF SHOULD BE KEPT 
 
     def get_data_csv(self, filepath, source_crs=4326, **kwargs):
         """
@@ -445,7 +439,7 @@ class st_visualizer:
         self.set_source(source)
         self.__suffix = suffix
 
-    def create_canvas(self, title, x_range=None, y_range=None, tile_provider='CARTODBPOSITRON', suffix='_merc', tile_kwargs={}, **kwargs):        
+    def create_canvas(self, title, x_range=None, y_range=None, tile_provider='CARTODBPOSITRON', suffix='_merc', padding=0.30, tile_kwargs={}, **kwargs):        
         """
         Create the instance's Canvas and CDS.
 
@@ -472,10 +466,27 @@ class st_visualizer:
             if self.limit < len(self.data):
                 title = f'{title} - Showing {self.limit} out of {len(self.data)} records'
             bbox = self.data.total_bounds
+            x_min, y_min, x_max, y_max = bbox
+
+            x_span = x_max - x_min
+            y_span = y_max - y_min
+
+            
+            pad_x = x_span * padding
+            pad_y = y_span * padding
+
+            x_min -= pad_x
+            x_max += pad_x
+            y_min -= pad_y
+            y_max += pad_y
+
+            
             if x_range is None:
-                x_range = (np.floor(bbox[0]), np.ceil(bbox[2]))
+                x_range = (x_min, x_max)
             if y_range is None:
-                y_range = (np.floor(bbox[1]), np.ceil(bbox[3]))
+                y_range = (y_min, y_max)
+            
+            self.padding = padding
 
         elif self.source is not None and len(self.source.data) > 0:
             try:
@@ -487,7 +498,7 @@ class st_visualizer:
             except Exception as e:
                 logger.warning(f"Could not infer bounds from source: {e}")
 
-        # --- Default to empty map extent if nothing to show ---
+        #Default to empty map extent if nothing to show
         if x_range is None or y_range is None:
             x_range = (-2.003e7, 2.003e7)
             y_range = (-2.003e7, 2.003e7)
@@ -529,7 +540,9 @@ class st_visualizer:
                 empty_dict = {col: [] for col in cds_columns}
                 self.source = ColumnDataSource(empty_dict)
                 self.__suffix = suffix
+                self.padding = padding
                 logger.info(f"Initialized empty ColumnDataSource with columns: {list(empty_dict.keys())}")
+
                 
                 
 
@@ -1032,7 +1045,7 @@ class st_visualizer:
         return grid
 
 
-    def show_figures(self, figures=None, sizing_mode=None, toolbar_location='above', ncols=None, width=None, height=None, toolbar_options=None, merge_tools=True, notebook=True, doc=None, notebook_url='http://localhost:8888', **kwargs):
+    def show_figures(self, live=False, figures=None, sizing_mode=None, toolbar_location='above', ncols=None, width=None, height=None, toolbar_options=None, merge_tools=True, notebook=True, doc=None, notebook_url='http://localhost:8888', **kwargs):
         """
         Render a Bokeh grid layout either in a Jupyter notebook or a Bokeh server.
             
@@ -1071,15 +1084,20 @@ class st_visualizer:
             doc.add_root(grid)
 
         if notebook:
-            reset_output()
-            output_notebook(**kwargs)
+            if live:
+                reset_output()
+                output_notebook(**kwargs)
 
-            self._bokeh_handle = show(
-                grid,
-                notebook_handle=True,
-                notebook_url=notebook_url
-            )
-            
-            print("Live notebook handle created, use push_notebook() to stream updates.")
+                self._bokeh_handle = show(
+                    grid,
+                    notebook_handle=True,
+                    notebook_url=notebook_url
+                )
+                
+                # print("Live notebook handle created, use push_notebook() to stream updates.")
+            else:
+                reset_output()
+                output_notebook(**kwargs)
+                show(bokeh_app, notebook_url=notebook_url)
         else:
             bokeh_app(bokeh_io.curdoc() if doc is None else doc)
