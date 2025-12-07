@@ -170,7 +170,7 @@ class st_visualizer:
         """
         self.source = source
 
-    def get_data_stream(self, stream, source_crs=4326, refresh_rate=1000, notebook = False):
+    def get_data_stream(self, stream, source_crs=4326, refresh_rate=1000, notebook=False):
         """
         Consume data from a streaming source and periodically update the visualization.
 
@@ -190,7 +190,6 @@ class st_visualizer:
             raise ValueError("No stream provided")
 
         # Initialize Arrow cache if not present
-        # TODO: probably move to constructor if this the way to go?
         if not hasattr(self, "_arrow_cache"):
             self._arrow_cache = None
 
@@ -245,7 +244,7 @@ class st_visualizer:
             gdf[f"lat{self.__suffix}"] = gdf.geometry.y
             return gdf
 
-        #TODO: Add bounding box focusing on first data streaming.
+        
         def st_stream_callback():
             batch_table = fetch_data()
             if batch_table is None:
@@ -266,6 +265,8 @@ class st_visualizer:
             if self.source is not None:
                 valid_cols = set(self.source.data.keys())
                 stream_dict = {k: v for k, v in stream_dict.items() if k in valid_cols}
+
+
                 #TODO: Check interaction with a filter
                 self.source.stream(stream_dict, rollover=self.limit)
                 # logger.info("Streamed batch")
@@ -855,6 +856,9 @@ class st_visualizer:
                     super().__init__(vsn_instance, widget)
                 
                 def callback(self, attr, old, new):
+                    if self.vsn_instance.data is None or self.vsn_instance.data.empty:
+                        return  # skip
+                    
                     self.callback_filter_data()
 
                     new_horizon = self.widget.value
@@ -896,6 +900,7 @@ class st_visualizer:
         kwargs.pop('value', None)
         kwargs.pop('options', None)
 
+
         options = [('', 'Select...')]
         options.extend([(i, i) for i in sorted(self.data[categorical_name].unique())])
 
@@ -907,6 +912,9 @@ class st_visualizer:
                     super().__init__(vsn_instance, widget)
                 
                 def callback(self, attr, old, new):
+                    if self.vsn_instance.data is None or self.vsn_instance.data.empty:
+                        return  # skip
+                    
                     self.callback_filter_data()
 
                     cat_value = self.widget.value
@@ -926,7 +934,7 @@ class st_visualizer:
         return cat_filter
     
 
-    def add_numerical_filter(self, filter_mode='>=', title='Value', numeric_name='Altitude', step=50, height_policy='min', callback_policy='value_throttled', callback_class=None, **kwargs):
+    def add_numerical_filter(self, filter_mode='>=', title='Value', numeric_name='Altitude', step=50, height_policy='min', callback_policy='value_throttled', callback_class=None, live=False, **kwargs):
         """
         Add a Numerical Filter to the Canvas
 
@@ -953,21 +961,30 @@ class st_visualizer:
             Other parameters related to the filter creation
         """
         kwargs.pop('value', None)
-        
+
         if filter_mode not in list(ALLOWED_FILTER_OPERATORS.keys()):
             logger.error(f' ❌ filter_mode must be one of the following: {list(ALLOWED_FILTER_OPERATORS.keys())}')
             raise ValueError(f' Invalid Filter Mode.')
         
-        start, end = self.data[numeric_name].agg(['min', 'max'])
-        
-        if filter_mode != 'range':
-            # value = start if value is None else value
-            value = start
-            num_filter = bokeh_mdl.Slider(start=start, end=end, step=step, value=value, width=800, title=title, height_policy=height_policy, **kwargs)
+        if live:
+            num_filter = bokeh_mdl.Slider(
+                start=0, end=1, value=0, step=step,
+                width=800, title=title,
+                height_policy=height_policy,
+                **kwargs
+            )
+
         else:
-            # value = (start, end) if value is None else value
-            value = (start, end)
-            num_filter = bokeh_mdl.RangeSlider(start=start, end=end, step=step, value=value, width=800, title=title, height_policy=height_policy, **kwargs)
+            start, end = self.data[numeric_name].agg(['min', 'max'])
+
+            if filter_mode != 'range':
+                # value = start if value is None else value
+                value = start
+                num_filter = bokeh_mdl.Slider(start=start, end=end, step=step, value=value, width=800, title=title, height_policy=height_policy, **kwargs)
+            else:
+                # value = (start, end) if value is None else value
+                value = (start, end)
+                num_filter = bokeh_mdl.RangeSlider(start=start, end=end, step=step, value=value, width=800, title=title, height_policy=height_policy, **kwargs)
 
         if callback_class is None:
             class Callback(callbacks.BokehFilters):
@@ -975,6 +992,9 @@ class st_visualizer:
                     super().__init__(vsn_instance, widget)
                 
                 def callback(self, attr, old, new):
+                    if self.vsn_instance.data is None or self.vsn_instance.data.empty:
+                        return  # skip
+                    
                     self.callback_filter_data()
 
                     num_value = new
