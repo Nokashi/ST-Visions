@@ -79,6 +79,7 @@ class st_visualizer:
         self._stream = None
         self.is_centered_on_data = False
         self.padding = None
+        self.filter_col_map = {}
 
         logger.info(f"VISIONS instance initialized with limit={limit}, target_crs={target_crs}")
         # self._arrow_cache = None
@@ -260,7 +261,11 @@ class st_visualizer:
             self.__set_data(updated_data, self.sp_columns)
             self.prepare_data()
 
-            stream_dict = processed_batch.drop(columns=[processed_batch.geometry.name]).to_dict(orient="list")
+            self.refresh_filters() 
+
+            filtered_batch = self.apply_active_filters(processed_batch)
+
+            stream_dict = filtered_batch.drop(columns=[processed_batch.geometry.name]).to_dict(orient="list")
 
             if self.source is not None:
                 valid_cols = set(self.source.data.keys())
@@ -879,7 +884,7 @@ class st_visualizer:
         return temp_filter
 
     
-    def add_categorical_filter(self, title='Category', categorical_name='City_Country', height_policy='min', callback_class=None, **kwargs):
+    def add_categorical_filter(self, title='Category', live=False, categorical_name='City_Country', height_policy='min', callback_class=None, **kwargs):
         """
         Add a Categorical Filter to the Canvas
         
@@ -900,11 +905,15 @@ class st_visualizer:
         kwargs.pop('value', None)
         kwargs.pop('options', None)
 
+        if live:
+            options = [('', 'Select...')]
+            cat_filter = bokeh_mdl.Select(title=title, options=options, value=options[0][0], height_policy=height_policy, **kwargs)
+            self.filter_col_map[cat_filter] = categorical_name
+        else:
+            options = [('', 'Select...')]
+            options.extend([(i, i) for i in sorted(self.data[categorical_name].unique())])
 
-        options = [('', 'Select...')]
-        options.extend([(i, i) for i in sorted(self.data[categorical_name].unique())])
-
-        cat_filter = bokeh_mdl.Select(title=title, options=options, value=options[0][0], height_policy=height_policy, **kwargs)
+            cat_filter = bokeh_mdl.Select(title=title, options=options, value=options[0][0], height_policy=height_policy, **kwargs)
 
         if callback_class is None:
             class Callback(callbacks.BokehFilters):
@@ -933,6 +942,65 @@ class st_visualizer:
         
         return cat_filter
     
+    ################ TEST ###########################
+    
+
+    def refresh_filters(self):
+
+        from contextlib import contextmanager
+        @contextmanager
+        def suppress_bokeh_callbacks(widget):
+            old_callbacks = widget._callbacks.copy()
+            widget._callbacks.clear()
+            yield
+            widget._callbacks.update(old_callbacks)
+
+        for widget in self.widgets:
+
+            if isinstance(widget, bokeh_mdl.Slider) or isinstance(widget, bokeh_mdl.RangeSlider):
+                column = self.filter_col_map.get(widget)
+
+                start, end = self.data[column].agg(['min', 'max'])
+
+                with suppress_bokeh_callbacks(widget):
+                    widget.start = start
+                    widget.end = end
+            
+            elif isinstance(widget, bokeh_mdl.Select):
+                column = self.filter_col_map.get(widget, None)
+                if column is None or self.data is None or self.data.empty:
+                    widget.options = [('', 'Select...')]
+                    continue
+
+                #cats = sorted(self.data[cname].dropna().unique())
+                with suppress_bokeh_callbacks(widget):
+                    widget.options = [('', 'Select...')]
+                    widget.options.extend([(i, i) for i in sorted(self.data[column].unique())])
+
+    
+    def apply_active_filters(self, df):
+        """Apply all active filters to df."""
+        result = df
+
+        for widget in self.widgets:
+            column = self.filter_col_map.get(widget)
+            if column is None: 
+                continue
+
+            # numerical
+            if isinstance(widget, bokeh_mdl.Slider):
+                result = result[result[column] >= widget.value]
+
+            if isinstance(widget, bokeh_mdl.RangeSlider):
+                lo, hi = widget.value
+                result = result[result[column].between(lo, hi)]
+
+            if isinstance(widget, bokeh_mdl.Select):
+                if widget.value:
+                    result = result[result[column] == widget.value]
+            
+        return result
+        
 
     def add_numerical_filter(self, filter_mode='>=', title='Value', numeric_name='Altitude', step=50, height_policy='min', callback_policy='value_throttled', callback_class=None, live=False, **kwargs):
         """
@@ -967,12 +1035,13 @@ class st_visualizer:
             raise ValueError(f' Invalid Filter Mode.')
         
         if live:
-            num_filter = bokeh_mdl.Slider(
-                start=0, end=1, value=0, step=step,
-                width=800, title=title,
-                height_policy=height_policy,
-                **kwargs
-            )
+
+            if filter_mode != 'range':
+                num_filter = bokeh_mdl.Slider(start=0, end=1, value=0, step=step, width=800, title=title, height_policy=height_policy, **kwargs)
+            else:
+                num_filter = bokeh_mdl.RangeSlider(start=0, end=1, value=(0,1) , step=step, width=800, title=title, height_policy=height_policy, **kwargs)
+            
+            self.filter_col_map[num_filter] = numeric_name
 
         else:
             start, end = self.data[numeric_name].agg(['min', 'max'])
