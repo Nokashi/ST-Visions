@@ -807,7 +807,7 @@ class st_visualizer:
         self.figure.add_tools(bokeh_mdl.LassoSelectTool(**kwargs))
 
 
-    def add_temporal_filter(self, temporal_name='ts', temporal_unit='s', step_ms=3600000, start_date=None, end_date=None, title='Temporal Horizon', height_policy='min', callback_policy='value_throttled', callback_class=None, **kwargs):
+    def add_temporal_filter(self, temporal_name='ts', temporal_unit='s', live=False, step_ms=3600000, start_date=None, end_date=None, title='Temporal Horizon', height_policy='min', callback_policy='value_throttled', callback_class=None, **kwargs):
         """
         Add a Temporal Filter to the Canvas
         
@@ -836,23 +836,41 @@ class st_visualizer:
 
         step = step_ms
 
-        start_date = (pd.to_datetime(self.data[temporal_name].min(), 
-                    unit=temporal_unit) if start_date is None else pd.to_datetime(start_date))
-        
-        end_date = (pd.to_datetime(self.data[temporal_name].max(), 
-                unit=temporal_unit) if end_date is None else pd.to_datetime(end_date))
+        if live:
+            template_start = pd.Timestamp("1970-01-01")
+            template_end   = pd.Timestamp("1970-01-02")
 
-        temp_filter = bokeh.models.DatetimeRangeSlider(
-            title=title,
-            start=start_date,
-            end=end_date,
-            value=(start_date, end_date), 
-            step=step, 
-            format='%d %b %Y %H:%M:%S.%3N',
-            bar_color="royalblue", 
-            min_width= 500,
-            height_policy=height_policy
-        )
+            temp_filter = bokeh.models.DatetimeRangeSlider(
+                title=title,
+                start=template_start,
+                end=template_end,
+                value=(template_start, template_end),
+                step=step_ms,
+                format='%d %b %Y %H:%M:%S.%3N',
+                height_policy=height_policy,
+                disabled=True,
+                **kwargs
+            )
+
+            self.filter_col_map[temp_filter] = temporal_name
+        else:
+            start_date = (pd.to_datetime(self.data[temporal_name].min(), 
+                        unit=temporal_unit) if start_date is None else pd.to_datetime(start_date))
+            
+            end_date = (pd.to_datetime(self.data[temporal_name].max(), 
+                    unit=temporal_unit) if end_date is None else pd.to_datetime(end_date))
+
+            temp_filter = bokeh.models.DatetimeRangeSlider(
+                title=title,
+                start=start_date,
+                end=end_date,
+                value=(start_date, end_date), 
+                step=step, 
+                format='%d %b %Y %H:%M:%S.%3N',
+                bar_color="royalblue", 
+                min_width= 500,
+                height_policy=height_policy
+            )
 
 
         if callback_class is None:
@@ -956,10 +974,13 @@ class st_visualizer:
             widget._callbacks.update(old_callbacks)
 
         for widget in self.widgets:
+            column = self.filter_col_map.get(widget)
 
             if isinstance(widget, bokeh_mdl.Slider) or isinstance(widget, bokeh_mdl.RangeSlider):
-                column = self.filter_col_map.get(widget)
 
+                if column is None or self.data is None or self.data.empty:
+                    continue
+                
                 start, end = self.data[column].agg(['min', 'max'])
 
                 with suppress_bokeh_callbacks(widget):
@@ -967,7 +988,7 @@ class st_visualizer:
                     widget.end = end
             
             elif isinstance(widget, bokeh_mdl.Select):
-                column = self.filter_col_map.get(widget, None)
+                # column = self.filter_col_map.get(widget, None)
                 if column is None or self.data is None or self.data.empty:
                     widget.options = [('', 'Select...')]
                     continue
@@ -976,6 +997,27 @@ class st_visualizer:
                 with suppress_bokeh_callbacks(widget):
                     widget.options = [('', 'Select...')]
                     widget.options.extend([(i, i) for i in sorted(self.data[column].unique())])
+
+            elif isinstance(widget, bokeh_mdl.DatetimeRangeSlider):
+                #ts = pd.to_datetime(self.data[column])
+                #start = ts.min()
+                #end = ts.max()
+
+                if column is None or self.data.empty:
+                    continue
+
+                ts = pd.to_datetime(self.data[column])
+                start = ts.min()
+                end = ts.max()
+
+                with suppress_bokeh_callbacks(widget):
+                    widget.start = start
+                    widget.end = end
+
+                    if widget.value is None or widget.value[0] < start or widget.value[1] > end:
+                        widget.value = (start, end)
+
+                    widget.disabled = False
 
     
     def apply_active_filters(self, df):
@@ -998,6 +1040,16 @@ class st_visualizer:
             if isinstance(widget, bokeh_mdl.Select):
                 if widget.value:
                     result = result[result[column] == widget.value]
+            
+            if isinstance(widget, bokeh_mdl.DatetimeRangeSlider):
+                lo_ms, hi_ms = widget.value
+
+                lo = pd.to_datetime(lo_ms, unit="ms")
+                hi = pd.to_datetime(hi_ms, unit="ms")
+
+                ts = pd.to_datetime(result[column])
+
+                result = result[ts.between(lo, hi)]
             
         return result
         
