@@ -261,7 +261,7 @@ class st_visualizer:
             self.__set_data(updated_data, self.sp_columns)
             self.prepare_data()
 
-            self.refresh_filters() 
+            self.update_filter_bounds() 
 
             filtered_batch = self.apply_active_filters(processed_batch)
 
@@ -945,7 +945,7 @@ class st_visualizer:
     ################ TEST ###########################
     
 
-    def refresh_filters(self):
+    def update_filter_bounds(self):
 
         from contextlib import contextmanager
         @contextmanager
@@ -987,7 +987,7 @@ class st_visualizer:
             if column is None: 
                 continue
 
-            # numerical
+            
             if isinstance(widget, bokeh_mdl.Slider):
                 result = result[result[column] >= widget.value]
 
@@ -1041,6 +1041,7 @@ class st_visualizer:
             else:
                 num_filter = bokeh_mdl.RangeSlider(start=0, end=1, value=(0,1) , step=step, width=800, title=title, height_policy=height_policy, **kwargs)
             
+            #TODO: key -> list, pass filter mode too
             self.filter_col_map[num_filter] = numeric_name
 
         else:
@@ -1059,6 +1060,8 @@ class st_visualizer:
             class Callback(callbacks.BokehFilters):
                 def __init__(self, vsn_instance, widget):
                     super().__init__(vsn_instance, widget)
+                    self.filter_op = ALLOWED_FILTER_OPERATORS[filter_mode]
+                    
                 
                 def callback(self, attr, old, new):
                     if self.vsn_instance.data is None or self.vsn_instance.data.empty:
@@ -1072,7 +1075,7 @@ class st_visualizer:
                     if filter_mode == 'range':
                         new_pts = new_pts.loc[new_pts[numeric_name].between(num_value[0], num_value[1], inclusive='both')]
                     else:
-                        new_pts = new_pts.loc[ALLOWED_FILTER_OPERATORS[filter_mode](new_pts[numeric_name], num_value)]
+                        new_pts = new_pts.loc[self.filter_op(new_pts[numeric_name], num_value)]
             
                     self.callback_prepare_data(new_pts, self.widget.id==self.vsn_instance.aquire_canvas_data)
             

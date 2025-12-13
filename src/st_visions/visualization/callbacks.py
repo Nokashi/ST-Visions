@@ -45,6 +45,7 @@ class BokehFilters:
           * If the intermediate storage (canvas_data) is empty fetch the loaded dataset; otherwise
           * Fetch the filtered data via the intermediate storage.
         '''
+        #TODO payload conditioonal on canvas data dict
         if self.vsn_instance.aquire_canvas_data and (self.vsn_instance.canvas_data is not None):        
             # print ('Fetching Filtered Data')
             return self.vsn_instance.canvas_data
