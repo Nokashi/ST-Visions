@@ -1,12 +1,13 @@
 import sys, os
 sys.path.append(os.path.abspath('../../src'))
 
-from st_visions.config.load_env import load_environment
 from bokeh.models import Div, WheelZoomTool
 from bokeh.layouts import row
-from st_visions.visualization.st_visualizer import st_visualizer
-import st_visions.express.st_vizexpress as viz_express
-env = load_environment()
+from visualization.st_visualizer import st_visualizer
+import express.st_vizexpress as viz_express
+from dotenv import load_dotenv
+load_dotenv("..\.env")
+env = os.environ
 
 # TO EXECUTE SCRIPT USE (ON REMOTE SERVER)
 # python -m bokeh serve --show data/scripts/test.py --allow-websocket-origin=<NODE_IP_ADDRESS>:<BOKEH_PORT>

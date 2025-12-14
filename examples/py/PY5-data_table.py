@@ -2,10 +2,11 @@ import sys, os
 sys.path.append(os.path.abspath('../../src'))
 
 import pandas as pd
-from st_visions.config.load_env import load_environment
 import bokeh.models as bkhm
-from st_visions.visualization.st_visualizer import st_visualizer
-env = load_environment()
+from visualization.st_visualizer import st_visualizer
+from dotenv import load_dotenv
+load_dotenv("..\.env")
+env = os.environ
 
 
 
