@@ -9,6 +9,7 @@ ST_VisionsEnv
 .ipynb_checkpoints
 data
 examples/data
+examples/docker_composer
 .venv
 doc/report
 .env

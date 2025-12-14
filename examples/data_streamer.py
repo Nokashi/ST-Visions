@@ -1,10 +1,13 @@
 import time
+import os
 from kafka import KafkaProducer
 import json
 import pandas as pd
 from loguru import logger
-from src.st_visions.config.load_env import load_environment
-env = load_environment()
+from dotenv import load_dotenv
+load_dotenv(".env")
+env = os.environ
+import sys
 
 
 def simulate_kafka_stream(
@@ -12,7 +15,7 @@ def simulate_kafka_stream(
     topic="test_topic",
     bootstrap_servers="localhost:9092",
     key_field=None,
-    delay=0.001
+    delay=0.01
 ):
     df = pd.read_csv(csv_path).head(20000)
     logger.info(f"Loaded CSV: {len(df)} rows. Streaming to '{topic}'...")
@@ -34,4 +37,15 @@ def simulate_kafka_stream(
 
 
 if __name__ == "__main__":
-    simulate_kafka_stream(env['SARONIC_GULF_AIS'], 'st-viz-topic')
+
+    if len(sys.argv) < 2:
+        raise ValueError("Please provide a mode: categorical or numerical")
+
+    mode = sys.argv[1]
+
+    if mode == "categorical":
+        simulate_kafka_stream(env['CATEGORICAL_SUBSET_DEMO_STREAMER'], 'st-viz-topic')
+    elif mode == "numerical":
+        simulate_kafka_stream(env['SARONIC_GULF_AIS_STREAMER'], 'st-viz-topic')
+    else:
+        raise ValueError(f"Unknown mode: {mode}")
