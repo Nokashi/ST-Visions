@@ -16,6 +16,7 @@ import numpy as np
 from tqdm import tqdm
 import geopandas as gpd
 from loguru import logger
+from shapely.strtree import STRtree
 
 
 def concatPolyCoords(polyCoords):
@@ -187,7 +188,7 @@ def create_linestring_from_points(gdf, column_handlers, **kwargs):
     geom_col = gdf.geometry.name
 
     linestrings = (
-        gdf.groupby(column_handlers, group_keys=False, include_groups=False)
+        gdf.groupby(column_handlers, group_keys=False)
         .progress_apply(
             lambda l: shapely.geometry.LineString([p.coords[0] for p in l[geom_col]])
             if len(l) >= 2
@@ -265,6 +266,54 @@ def classify_area_proximity(trajectories, spatial_areas, compensate=False, buffe
         matched_indices = matched[intersects].index
 
         trajectories.loc[matched_indices, 'area_id'] = area_id
+
+    return trajectories
+
+def classify_area_proximity_bulk(
+    trajectories,
+    spatial_areas,
+    compensate=False,
+    buffer_amount=1e-14,
+    verbose=True,
+):
+    """
+    Classify Point Geometries according to their Spatial Proximity
+    to one (or many) Spatial Area(s), using Shapely STRtree.query_bulk.
+    """
+    trajectories = trajectories.copy()
+    trajectories["area_id"] = None
+
+    if verbose:
+        logger.info("Preparing geometries...")
+
+    # Prepare point geometries (tree is built on points)
+    point_geoms = trajectories.geometry.values
+    tree = STRtree(point_geoms)
+
+    # Prepare area geometries
+    if compensate:
+        area_geoms = spatial_areas.geometry.buffer(buffer_amount).buffer(0).values
+    else:
+        area_geoms = spatial_areas.geometry.values
+
+    if verbose:
+        logger.info("Running bulk spatial query...")
+
+    # Bulk query: areas vs points
+    area_pos, point_pos = tree.query(
+        area_geoms,
+        predicate="intersects",
+    )
+
+    if len(area_pos) == 0:
+        return trajectories
+
+    # Map positional indices back to GeoDataFrame indices
+    area_ids = spatial_areas.index.values[area_pos]
+    traj_ids = trajectories.index.values[point_pos]
+
+    # Assign area_id (last match wins, same as original behavior)
+    trajectories.loc[traj_ids, "area_id"] = area_ids
 
     return trajectories
 
