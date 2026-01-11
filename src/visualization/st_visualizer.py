@@ -52,12 +52,17 @@ class st_visualizer:
             
         Parameters
         ----------
-        limit: int (default: 30000)
+        limit: int (default: ``30000``)
             The maximum number of geometries (glyphs/polygons/lines) to be visualized.
-        allow_complex_geometries: boolean (default: False)
+        allow_complex_geometries: boolean (default: ``False``)
             Choose to plot either the polygons' exterior (False) or along with its inner voids (True)
         target_crs: int (default: ```3857```)
             The target crs that the input geometries will be projected to prior to visualization.
+        sp_columns : list of str (Default: ``['lon', 'lat']``). (longitude column, Latitude Column)
+            Column names containing spatial coordinates when geometry column is absent.
+        expected_schema : pyarrow.Schema, optional (Default: ``None``)
+            Expected Arrow schema for CDS Initialization for streaming scenarios. If provided, validates 
+            incoming streaming data against schema for type consistency.
         """
         self.limit = limit
         self.allow_complex_geometries = allow_complex_geometries
@@ -83,7 +88,6 @@ class st_visualizer:
 
         logger.info(f"VISIONS instance initialized with limit={limit}, target_crs={target_crs}")
         # self._arrow_cache = None
-        # self.doc = doc #TODO: Might break at multiple instances. might need refactor
     
 
     def __set_data(self, data, columns):
@@ -154,7 +158,7 @@ class st_visualizer:
             
         Parameters
         ----------
-        figure: bokeh.plotting.figure instance (default:None)
+        figure: bokeh.plotting.figure instance (default: ``None``)
             The canvas in which the data will be drawn to.
         """
         self.figure = figure
@@ -166,14 +170,18 @@ class st_visualizer:
             
         Parameters
         ----------
-        figure: bokeh.models.ColumnDataSource instance (default:None)
+        figure: bokeh.models.ColumnDataSource instance (default: ``None``)
             The communication 'bridge' that will send data from the loaded dataset to the Canvas.
         """
         self.source = source
 
     def get_data_stream(self, stream, source_crs=4326, refresh_rate=1000, notebook=False):
         """
-        Consume data from a streaming source and periodically update the visualization.
+        Consume and visualize real-time spatio-temporal data from streaming sources.
+        
+        Establishes a continuous data pipeline that fetches, processes, and visualizes
+        streaming data with automatic updates. Supports both Jupyter notebook and
+        Bokeh server deployment modes.
 
         Uses an Arrow table cache for efficient append operations.
 
@@ -181,10 +189,13 @@ class st_visualizer:
         ----------
         stream : ST_AbstractStream
             Streaming source instance (Kafka, etc.)
-        source_crs : int
-            Coordinate reference system of the incoming data (default: 4326).
-        refresh_rate : int
-            Update frequency in milliseconds (default: 1000 ms = 1 second)
+        source_crs : int (default: ``4326``).
+            Coordinate reference system of the incoming data.
+        refresh_rate : int (default: ``1000 ms = 1 second``)
+            Update frequency in milliseconds 
+        notebook : bool, optional (Default: ``False``)
+            * If True, runs in Jupyter notebook mode with thread-based updates.
+            * If False, runs in Bokeh server mode with document callbacks.
         """
 
         if not stream:
@@ -206,7 +217,14 @@ class st_visualizer:
             self._stop_callback = threading.Event()
 
         def fetch_data():
-            """Fetch latest data batch as a PyArrow Table."""
+            """
+            Fetch latest data batch as a PyArrow Table.   
+        
+            Returns
+            -------
+            pyarrow.Table or None
+                Arrow Table containing new data batch, or None if no data available.
+            """
             data_dict = stream.fetch_data(max_points=self.limit)
             if not data_dict:
                 return None
@@ -219,6 +237,24 @@ class st_visualizer:
                 return None
 
         def append_to_cache(batch_table):
+            """
+            Append new batch to Arrow cache with rollover management.
+            
+            Parameters
+            ----------
+            batch_table : pyarrow.Table
+                New data batch to append.
+            
+            Returns
+            -------
+            pyarrow.Table
+                Updated cache after append operation.
+            
+            Notes
+            -----
+            Implements FIFO rollover: when cache exceeds `self.limit`, oldest
+            records are removed to maintain size constraint.
+            """
             try:
                 if self._arrow_cache is not None:
                     combined = pa.concat_tables([self._arrow_cache, batch_table], promote_options='default')
@@ -238,6 +274,20 @@ class st_visualizer:
                 return batch_table
 
         def process_batch(df):
+            """
+            Convert batch DataFrame to GeoDataFrame with proper geometry and projection.
+            
+            Parameters
+            ----------
+            df : pandas.DataFrame
+                Raw data batch from stream.
+            
+            Returns
+            -------
+            geopandas.GeoDataFrame
+                Processed spatial data with projected coordinates and suffix-appended
+                lon/lat columns for visualization.
+            """
             gdf = geom_helper.create_geometry(df, coordinate_columns=self.sp_columns, source_crs=source_crs)
             gdf = gdf.to_crs(self.target_crs)
     
@@ -247,6 +297,10 @@ class st_visualizer:
 
         
         def st_stream_callback():
+            """
+            Core streaming callback function executed on each refresh cycle.
+            
+            """
             batch_table = fetch_data()
             if batch_table is None:
                 return
@@ -261,7 +315,7 @@ class st_visualizer:
             self.__set_data(updated_data, self.sp_columns)
             self.prepare_data()
 
-            self.update_filter_bounds() 
+            self.update_filters() 
 
             filtered_batch = self.apply_active_filters(processed_batch)
 
@@ -328,6 +382,12 @@ class st_visualizer:
 
         if notebook:
             def notebook_periodic_callback():
+                """
+                Thread-based periodic callback for Jupyter notebook deployment.
+
+                Runs in a separate daemon thread to avoid blocking the notebook
+                while maintaining the refresh rate.
+                """
                 while not self._stop_callback.is_set():
                     try:
                         st_stream_callback()
@@ -342,7 +402,7 @@ class st_visualizer:
             self._notebook_thread = thread
             logger.info("Notebook thread started")
         else:
-            # Server mode
+            # Server mode: Register callback with Bokeh document
             doc = bokeh_io.curdoc()
             doc.add_periodic_callback(st_stream_callback, refresh_rate)
             logger.info("Bokeh periodic callback registered")
@@ -394,11 +454,10 @@ class st_visualizer:
 
         Parameters
         ----------
-        data: GeoPandas GeoDataFrame (default:None)
+        data: GeoPandas GeoDataFrame (default: ``None``)
             Prepare either the loaded data (None) or another DataFrame
-        suffix: str (default: None)
+        suffix: str (default: ``None``)
             A suffix for the column name of the extracted spatial coordinates
-
 
         Returns
         -------
@@ -447,7 +506,9 @@ class st_visualizer:
 
     def create_canvas(self, title, x_range=None, y_range=None, tile_provider='CARTODBPOSITRON', suffix='_merc', padding=0.30, tile_kwargs={}, **kwargs):        
         """
-        Create the instance's Canvas and CDS.
+        Create the instance's Canvas and CDS. Handles both static datasets and real-time streaming scenarios.
+
+        In the case of real-time streaming, the method uses the expected schema as a baseline to initialize an empty CDS that's ready to receive data from a stream
 
         Parameters
         ----------
@@ -462,7 +523,9 @@ class st_visualizer:
             an existing WMTSTileSource instance.
         suffix: str (default: ```'_merc'```)
             A suffix for the column name of the extracted spatial coordinates
-        tile_kwargs: Dict
+        padding : float, optional (Default: ``0.30`` = 30% Padding)
+            Padding factor added to data bounds when calculating automatic ranges.
+        tile_kwargs: Dict (Default: ``Empty Dict``)
             Additional Keyword arguments related to the tile provider of the instance's canvas (consult the WMTSTileSource Docs)
             https://docs.bokeh.org/en/latest/docs/reference/models/tiles.html
         **kwargs: Dict
@@ -504,7 +567,7 @@ class st_visualizer:
             except Exception as e:
                 logger.warning(f"Could not infer bounds from source: {e}")
 
-        #Default to empty map extent if nothing to show
+        #Default to empty full map if nothing to show
         if x_range is None or y_range is None:
             x_range = (-2.003e7, 2.003e7)
             y_range = (-2.003e7, 2.003e7)
@@ -565,6 +628,9 @@ class st_visualizer:
             or a Tuple of colors in hexadecimal format.
         categorical_name: str 
             The column name of the loaded dataset that contains the categorical values.
+        **kwargs: Dict
+            Other arguments related to creating the instance's CategoricalColorMapper
+            More info here: https://docs.bokeh.org/en/latest/docs/reference/models/mappers.html#bokeh.models.CategoricalColorMapper
         
         Returns
         -------
@@ -597,14 +663,23 @@ class st_visualizer:
     
     def add_numerical_colormap(self, palette, numeric_name, val_range=None, nan_color='gray', colorbar=True, cb_orientation='vertical', cb_location='right', label_standoff=12, border_line_color=None, location=(0,0), **kwargs): 
         """
-        Create a Numerical Colormap.
+        Apply quantitative color mapping to numerical data.
+        
+        Creates a linear color mapping that translates numerical values from a
+        specified data column into a continuous color gradient. Supports automatic
+        color bar generation with configurable placement and styling.
             
         Parameters
         ----------
         palette: str or Tuple 
-            The color palette of the colormap. It can either be one of Bokeh's default palettes or a Tuple of colors in hexadecimal format.
+            The color palette of the colormap. Cam Be:
+                * Predefined palette name from `ALLOWED_NUMERICAL_COLOR_PALETTES`
+                * Custom tuple of hex color strings (e.g., ``('#FF0000', '#00FF00', '#0000FF')``)
         numeric_name: str 
             The column name of the loaded dataset that contains the numerical values
+        val_range : tuple of float (Default: ``None``)
+            Custom value range for color mapping as (min, max).
+            If None, automatically uses min/max from the data column.
         nan_color: str or bokeh.colors instance (default: ```'gray'```)
             The color name for the geometries that are outside the range of the colormap
         colorbar: boolean (default: True)
@@ -613,19 +688,24 @@ class st_visualizer:
             The orientation of the colorbar
         cb_location: str (either ```'left'```, ```'right'```, ```'above'```, ```'below'```)
             The location of the colorbar relative to the Canvas
-        label_standoff: int (default: 12)
+        label_standoff: int (default: ``12``)
             The distance (in pixels) to separate the tick labels from the color bar.
-        border_line_color: str or bokeh.colors instance (default: None)
+        border_line_color: str or bokeh.colors instance (default: ``None``)
             The color of the border of the colorbar        
         location: Tuple (int, int)
             Adjust the colorbar location relative to ```cb_orientation``` and ```cb_location```
         **kwargs: Dict
-            Other aarguments related to the creation of the colorbar
+            Other arguments related to the creation of the colorbar
+            read more: 
+                * Bokeh Color Mappers: https://docs.bokeh.org/en/latest/docs/reference/models/mappers.html
+                * Bokeh Palettes: https://docs.bokeh.org/en/latest/docs/reference/palettes.html
         
         Returns
         -------
         cmap: Dict
-            The Numerical Colormap 
+            Color mapping configuration dictionary with keys:
+            - 'field': str - The data column name used for coloring
+            - 'transform': bokeh.models.LinearColorMapper - The color mapper object
         """
         if not (palette in ALLOWED_NUMERICAL_COLOR_PALETTES or isinstance(palette, palettes.Palette.__origin__)):
             logger.error(f'❌ Invalid palette: "{palette}". Must be a tuple or one of the allowed palettes: {ALLOWED_NUMERICAL_COLOR_PALETTES}')          
@@ -650,12 +730,17 @@ class st_visualizer:
 
     def add_marker(self, marker='circle', size=10, color='royalblue', sec_color='lightslategray', alpha=0.7, muted_alpha=0, **kwargs):
         """
-        Add a Glyph to the Canvas
+        Add point marker glyphs to visualize spatial data on the canvas.
+        
+        Creates scatter plot markers for point geometries with configurable appearance
+        and interactive behavior. Supports data-driven coloring when used with
+        colormap configurations and integrates with the library's interactive
+        filtering and legend systems.
             
         Parameters
         ----------
-        glyph_type: str (default: ```'circle'```)
-            The Glyph's type
+        marker : str (Default: ``Circle``)
+            Glyph marker type. Must be one of `ALLOWED_BASIC_MARKERS`.
         size: int (default: 10)
             The Glyph's size
         color: str or bokeh.colors instance (default: ```'royalblue'```)
@@ -667,12 +752,13 @@ class st_visualizer:
         muted_alpha:float (values in [0,1] -- default: ```0```)
             The Glyph's alpha when disabled from the legend
         **kwargs: Dict
-            Other arguments related to the creation of a Glyph
+            Additional keyword arguments passed to `bokeh.plotting.figure.scatter()`.
+            More info: https://docs.bokeh.org/en/latest/docs/reference/plotting/figure.html#bokeh.plotting.figure.Figure.scatter
         
         Returns
         -------
-        renderer: Bokeh glyph instance
-            The instance of the added glyph
+        renderer: Bokeh scatter instance
+            The instance of the added marker glypths
         """
         if marker not in ALLOWED_BASIC_MARKERS:
             logger.error(f'Invalid marker: "{marker}". Allowed markers are: {ALLOWED_BASIC_MARKERS}')
@@ -810,6 +896,10 @@ class st_visualizer:
     def add_temporal_filter(self, temporal_name='ts', temporal_unit='s', live=False, step_ms=3600000, start_date=None, end_date=None, title='Temporal Horizon', height_policy='min', callback_policy='value_throttled', callback_class=None, **kwargs):
         """
         Add a Temporal Filter to the Canvas
+
+        Creates a DatetimeRangeSlider widget that allows users to filter data
+        within a specified time window. Supports both static datasets and live
+        streaming data with automatic time range adjustment.
         
         Parameters
         ----------
@@ -817,6 +907,12 @@ class st_visualizer:
             The column name of the loaded dataset that contains the temporal information
         temporal_unit: str (default: ```'s'```)
             The unit (e.g., seconds -- s) of the temporal information
+        live : bool (Default: ``False``)
+            Defines filter behavior depending on enviroment
+                * **Static mode** (`live=False`): Filter range fixed to data min/max or
+                custom `start_date`/`end_date`. Ideal for historical data exploration.
+                * **Live mode** (`live=True`): Filter range dynamically adjusts for
+                streaming data. Creates placeholder range that updates with incoming data.
         step_ms: float (default: 3600000 -- 1 hr.)
             The step (in ms) of the temporal filter
         title: str (default: 'Temporal Horizon')
@@ -836,9 +932,10 @@ class st_visualizer:
 
         step = step_ms
 
+        # Live streaming mode: Create placeholder range
         if live:
-            template_start = pd.to_datetime(1502201712000, unit=temporal_unit)
-            template_end   = pd.to_datetime(1502201714000, unit=temporal_unit)
+            template_start = pd.to_datetime(0, unit=temporal_unit)
+            template_end   = pd.to_datetime(10, unit=temporal_unit)
 
             temp_filter = bokeh.models.DatetimeRangeSlider(
                 title=title,
@@ -853,6 +950,7 @@ class st_visualizer:
             )
 
             self.filter_col_map[temp_filter] = (temporal_name, None)
+        # Static mode: Use data-based range
         else:
             start_date = (pd.to_datetime(self.data[temporal_name].min(), 
                         unit=temporal_unit) if start_date is None else pd.to_datetime(start_date))
@@ -872,7 +970,7 @@ class st_visualizer:
                 height_policy=height_policy
             )
 
-
+        # Set up callback mechanism
         if callback_class is None:
             class Callback(callbacks.BokehFilters):
                 def __init__(self, vsn_instance, widget):
@@ -904,7 +1002,7 @@ class st_visualizer:
         return temp_filter
 
     
-    def add_categorical_filter(self, title='Category', live=False, categorical_name='City_Country', height_policy='min', callback_class=None, **kwargs):
+    def add_categorical_filter(self, title='Vessel Type', live=False, categorical_name='vessel_type', height_policy='min', callback_class=None, **kwargs):
         """
         Add a Categorical Filter to the Canvas
         
@@ -912,8 +1010,14 @@ class st_visualizer:
         ----------
         title: str (default: 'Category')
             The title of the categorical filter
-        categorical_name: str (default: ```'City_Country'```)
+        categorical_name: str (default: ```'vessel_type'```)
             The column name of the loaded dataset that contains the categorical information
+        live : bool (Default: ``False``)
+            Defines filter behavior depending on enviroment
+                * **Static mode** (`live=False`): Filter range fixed to data min/max or
+                custom `start_date`/`end_date`. Ideal for historical data exploration.
+                * **Live mode** (`live=True`): Filter range dynamically adjusts for
+                streaming data. Creates placeholder range that updates with incoming data.
         height_policy: str (default: 'min')
             Describes how the component should maintain its height (accepted values: 'auto', 'fixed', 'fit', 'min', 'max')
             From: https://docs.bokeh.org/en/1.1.0/docs/reference/models/layouts.html#bokeh.models.layouts.LayoutDOM.height_policy
@@ -962,97 +1066,7 @@ class st_visualizer:
         
         return cat_filter
     
-    ################ TEST ###########################
-    
-
-    def update_filter_bounds(self):
-
-        from contextlib import contextmanager
-        @contextmanager
-        def suppress_bokeh_callbacks(widget):
-            old_callbacks = widget._callbacks.copy()
-            widget._callbacks.clear()
-            yield
-            widget._callbacks.update(old_callbacks)
-
-        for widget in self.widgets:
-            col_metadata = self.filter_col_map.get(widget)
-            if col_metadata is None:
-                continue
-
-            column, mode = col_metadata
-
-            if isinstance(widget, bokeh_mdl.Slider) or isinstance(widget, bokeh_mdl.RangeSlider):
-                if column is None or self.data is None or self.data.empty:
-                    continue
-                
-                start, end = self.data[column].agg(['min', 'max'])
-
-                with suppress_bokeh_callbacks(widget):
-                    widget.start = start
-                    widget.end = end
-            
-            elif isinstance(widget, bokeh_mdl.Select):
-                # column = self.filter_col_map.get(widget, None)
-                if column is None or self.data is None or self.data.empty:
-                    widget.options = [('', 'Select...')]
-                    continue
-
-                #cats = sorted(self.data[cname].dropna().unique())
-                with suppress_bokeh_callbacks(widget):
-                    widget.options = [('', 'Select...')]
-                    widget.options.extend([(i, i) for i in sorted(self.data[column].unique())])
-
-            elif isinstance(widget, bokeh_mdl.DatetimeRangeSlider):
-                if column is None or self.data.empty:
-                    continue
-
-                ts = self.data[column]
-                start = ts.min()
-                end = ts.max()
-
-                with suppress_bokeh_callbacks(widget):
-                    widget.start = start
-                    widget.end = end
-
-    
-    def apply_active_filters(self, df):
-        """Apply all active filters to df."""
-        result = df
-
-        for widget in self.widgets:
-            col_metadata = self.filter_col_map.get(widget)
-            if col_metadata is None:
-                continue
-
-            column, mode = col_metadata
-
-            if isinstance(widget, bokeh_mdl.Slider):
-                #result = result[result[column] >= widget.value]
-                result = result[ALLOWED_FILTER_OPERATORS[mode](result[column], widget.value)]
-
-            if isinstance(widget, bokeh_mdl.RangeSlider):
-                lo, hi = widget.value
-                result = result[result[column].between(lo, hi)]
-
-            if isinstance(widget, bokeh_mdl.Select):
-                if widget.value:
-                    result = result[result[column] == widget.value]
-            
-            if isinstance(widget, bokeh_mdl.DatetimeRangeSlider):
-                lo, hi = widget.value
-
-                #lo = pd.to_datetime(lo_ms, unit="ms")
-                #hi = pd.to_datetime(hi_ms, unit="ms")
-
-                #ts = pd.to_datetime(result[column])
-
-                result = result[result[column].between(lo, hi)]
-            
-        return result
-        
-
-    def add_numerical_filter(self, filter_mode='>=', title='Value', numeric_name='Altitude', step=50, height_policy='min', callback_policy='value_throttled', callback_class=None, live=False, **kwargs):
+    def add_numerical_filter(self, filter_mode='>=', title='Value', numeric_name='speed', live=False, step=50, height_policy='min', callback_policy='value_throttled', callback_class=None,  **kwargs):
         """
         Add a Numerical Filter to the Canvas
 
@@ -1063,8 +1077,14 @@ class st_visualizer:
 
         title: str (default: 'Value')
             The title of the categorical filter
-        numeric_name: str (default: ```'Altitude'```)
+        numeric_name: str (default: ```'speed'```)
             The column name of the loaded dataset that contains the numeric information
+        live : bool (Default: ``False``)
+            Defines filter behavior depending on enviroment
+                * **Static mode** (`live=False`): Filter range fixed to data min/max or
+                custom `start_date`/`end_date`. Ideal for historical data exploration.
+                * **Live mode** (`live=True`): Filter range dynamically adjusts for
+                streaming data. Creates placeholder range that updates with incoming data.
         step: float (default: 50)
             The step in which the filter will move within the numeric range of the dataset.
         height_policy: str (default: 'min')
@@ -1136,6 +1156,131 @@ class st_visualizer:
         self.widgets.append(num_filter)
 
         return num_filter
+
+    
+
+    def update_filters(self):
+        """
+            Synchronize all active filter widget ranges when receiving new streaming data 
+        """
+
+        from contextlib import contextmanager
+        @contextmanager
+        def suppress_bokeh_callbacks(widget):
+            """
+            Context manager to temporarily suppress Bokeh widget callbacks.
+
+            Parameters
+            ----------
+            widget : bokeh.models.Widget
+            Widget whose callbacks should be suppressed.
+
+            Yields
+            ------
+            None
+            Enters context with callbacks suppressed.
+            """
+            old_callbacks = widget._callbacks.copy()
+            widget._callbacks.clear()
+            yield
+            widget._callbacks.update(old_callbacks)
+
+        for widget in self.widgets:
+            col_metadata = self.filter_col_map.get(widget)
+            if col_metadata is None:
+                continue
+
+            column, mode = col_metadata
+
+            if isinstance(widget, bokeh_mdl.Slider) or isinstance(widget, bokeh_mdl.RangeSlider):
+                if column is None or self.data is None or self.data.empty:
+                    continue
+                
+                start, end = self.data[column].agg(['min', 'max'])
+
+                with suppress_bokeh_callbacks(widget):
+                    widget.start = start
+                    widget.end = end
+            
+            elif isinstance(widget, bokeh_mdl.Select):
+                # column = self.filter_col_map.get(widget, None)
+                if column is None or self.data is None or self.data.empty:
+                    widget.options = [('', 'Select...')]
+                    continue
+
+                #cats = sorted(self.data[cname].dropna().unique())
+                with suppress_bokeh_callbacks(widget):
+                    widget.options = [('', 'Select...')]
+                    widget.options.extend([(i, i) for i in sorted(self.data[column].unique())])
+
+            elif isinstance(widget, bokeh_mdl.DatetimeRangeSlider):
+                if column is None or self.data.empty:
+                    continue
+
+                ts = self.data[column]
+                start = ts.min()
+                end = ts.max()
+
+                logger.info((start, end, start < end))
+
+                with suppress_bokeh_callbacks(widget):
+                    widget.start = start
+                    widget.end = end
+
+    
+    def apply_active_filters(self, df):
+        """
+        Apply active filters to a DataFrame
+
+        Parameters
+        ----------
+        df : pandas.DataFrame 
+            Input dataset to filter.
+        widget_subset : list of bokeh.models.Widget or None, optional
+            Specific widgets to apply. If None, applies all widgets.
+            Default is None.
+
+        Returns
+        -------
+        pandas.DataFrame 
+            Filtered data subset.
+        """
+        result = df
+
+        for widget in self.widgets:
+            col_metadata = self.filter_col_map.get(widget)
+            if col_metadata is None:
+                continue
+
+            column, mode = col_metadata
+
+            if isinstance(widget, bokeh_mdl.Slider):
+                #result = result[result[column] >= widget.value]
+                result = result[ALLOWED_FILTER_OPERATORS[mode](result[column], widget.value)]
+
+            if isinstance(widget, bokeh_mdl.RangeSlider):
+                lo, hi = widget.value
+                result = result[result[column].between(lo, hi)]
+
+            if isinstance(widget, bokeh_mdl.Select):
+                if widget.value:
+                    result = result[result[column] == widget.value]
+            
+            if isinstance(widget, bokeh_mdl.DatetimeRangeSlider):
+                lo, hi = widget.value
+
+                #lo = pd.to_datetime(lo_ms, unit="ms")
+                #hi = pd.to_datetime(hi_ms, unit="ms")
+
+                #ts = pd.to_datetime(result[column])
+                logger.info((lo, hi))
+
+                result = result[result[column].between(lo, hi)]
+            
+        return result
+        
+
+
     
 
     def prepare_grid(self, figures=None, sizing_mode=None, toolbar_location='above', ncols=None, width=None, height=None, toolbar_options=None, merge_tools=True):
