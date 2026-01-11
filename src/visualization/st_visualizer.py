@@ -30,7 +30,6 @@ from bokeh.layouts import column, row
 sys.path.append(os.path.join(os.path.dirname(__file__)))
 import geom_helper
 import callbacks
-import callbacks_v2
 import callbacks_v3
 import providers
 
@@ -975,7 +974,7 @@ class st_visualizer:
 
         # Set up callback mechanism
         if callback_class is None:
-            class Callback(callbacks_v3.BokehFilters):
+            class Callback(callbacks_v3.ST_BokehFilters):
                 def __init__(self, vsn_instance, widget):
                     super().__init__(vsn_instance, widget)
                 
@@ -1048,7 +1047,7 @@ class st_visualizer:
         self.filter_col_map[cat_filter] = (categorical_name, None)
 
         if callback_class is None:
-            class Callback(callbacks_v3.BokehFilters):
+            class Callback(callbacks_v3.ST_BokehFilters):
                 def __init__(self, vsn_instance, widget):
                     super().__init__(vsn_instance, widget)
                 
@@ -1138,7 +1137,7 @@ class st_visualizer:
         self.filter_col_map[num_filter] = (numeric_name, filter_mode)
         
         if callback_class is None:
-            class Callback(callbacks_v3.BokehFilters):
+            class Callback(callbacks_v3.ST_BokehFilters):
                 def __init__(self, vsn_instance, widget):
                     super().__init__(vsn_instance, widget)
                     self.filter_op = ALLOWED_FILTER_OPERATORS[filter_mode]
