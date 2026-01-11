@@ -30,6 +30,8 @@ from bokeh.layouts import column, row
 sys.path.append(os.path.join(os.path.dirname(__file__)))
 import geom_helper
 import callbacks
+import callbacks_v2
+import callbacks_v3
 import providers
 
 
@@ -949,7 +951,6 @@ class st_visualizer:
                 **kwargs
             )
 
-            self.filter_col_map[temp_filter] = (temporal_name, None)
         # Static mode: Use data-based range
         else:
             start_date = (pd.to_datetime(self.data[temporal_name].min(), 
@@ -969,10 +970,12 @@ class st_visualizer:
                 min_width= 500,
                 height_policy=height_policy
             )
+        
+        self.filter_col_map[temp_filter] = (temporal_name, None)
 
         # Set up callback mechanism
         if callback_class is None:
-            class Callback(callbacks.BokehFilters):
+            class Callback(callbacks_v3.BokehFilters):
                 def __init__(self, vsn_instance, widget):
                     super().__init__(vsn_instance, widget)
                 
@@ -981,19 +984,22 @@ class st_visualizer:
                         return  # skip
                     
                     self.callback_filter_data()
+                    full_data = self.get_data()
+                    filtered_data = self.vsn_instance.apply_active_filters(full_data)
 
-                    new_horizon = self.widget.value
-                    new_start = pd.to_datetime(new_horizon[0], unit='ms')
-                    new_end   = pd.to_datetime(new_horizon[1], unit='ms')
+                    #new_horizon = self.widget.value
+                    #new_start = pd.to_datetime(new_horizon[0], unit='ms')
+                    #new_end   = pd.to_datetime(new_horizon[1], unit='ms')
 
-                    logger.info(new_horizon)
+                    #logger.info(new_horizon)
 
                     # self.widget.title = (f'{title}: {new_start}...{new_end}')
 
-                    new_pts = self.get_data()
-                    new_pts = new_pts.loc[pd.to_datetime(new_pts[temporal_name], unit=temporal_unit).between(new_start, new_end)]
+                    #new_pts = self.get_data()
+                    #new_pts = new_pts.loc[pd.to_datetime(new_pts[temporal_name], unit=temporal_unit).between(new_start, new_end)]
 
-                    self.callback_prepare_data(new_pts, self.widget.id==self.vsn_instance.aquire_canvas_data)
+                    #self.callback_prepare_data(new_pts, True)
+                    self.callback_prepare_data(filtered_data)
             callback_class = Callback
         
         temp_filter.on_change(callback_policy, callback_class(self, temp_filter).callback)
@@ -1032,15 +1038,17 @@ class st_visualizer:
         if live:
             options = [('', 'Select...')]
             cat_filter = bokeh_mdl.Select(title=title, options=options, value=options[0][0], height_policy=height_policy, **kwargs)
-            self.filter_col_map[cat_filter] = (categorical_name, None)
+            
         else:
             options = [('', 'Select...')]
             options.extend([(i, i) for i in sorted(self.data[categorical_name].unique())])
 
             cat_filter = bokeh_mdl.Select(title=title, options=options, value=options[0][0], height_policy=height_policy, **kwargs)
 
+        self.filter_col_map[cat_filter] = (categorical_name, None)
+
         if callback_class is None:
-            class Callback(callbacks.BokehFilters):
+            class Callback(callbacks_v3.BokehFilters):
                 def __init__(self, vsn_instance, widget):
                     super().__init__(vsn_instance, widget)
                 
@@ -1049,15 +1057,18 @@ class st_visualizer:
                         return  # skip
                     
                     self.callback_filter_data()
+                    full_data = self.get_data()
+                    filtered_data = self.vsn_instance.apply_active_filters(full_data)
 
-                    cat_value = self.widget.value
-                    new_pts = self.get_data()
+                    #cat_value = self.widget.value
+                    #new_pts = self.get_data()
 
                     # print (cat_value, categorical_name)
-                    if cat_value:
-                        new_pts = new_pts.loc[new_pts[categorical_name] == cat_value].copy()
+                    #if cat_value:
+                        #new_pts = new_pts.loc[new_pts[categorical_name] == cat_value].copy()
                     
-                    self.callback_prepare_data(new_pts, self.widget.id==self.vsn_instance.aquire_canvas_data)
+                    #self.callback_prepare_data(new_pts, self.widget.id==self.vsn_instance.aquire_canvas_data)
+                    self.callback_prepare_data(filtered_data)
             
             callback_class = Callback
 
@@ -1104,7 +1115,7 @@ class st_visualizer:
             logger.error(f' ❌ filter_mode must be one of the following: {list(ALLOWED_FILTER_OPERATORS.keys())}')
             raise ValueError(f' Invalid Filter Mode.')
         
-        
+
         if live:
 
             if filter_mode != 'range':
@@ -1112,9 +1123,6 @@ class st_visualizer:
             else:
                 num_filter = bokeh_mdl.RangeSlider(start=0, end=1, value=(0,1) , step=step, width=800, title=title, height_policy=height_policy, **kwargs)
             
-            #TODO: key -> list, pass filter mode too
-            self.filter_col_map[num_filter] = (numeric_name, filter_mode)
-
         else:
             start, end = self.data[numeric_name].agg(['min', 'max'])
 
@@ -1127,8 +1135,10 @@ class st_visualizer:
                 value = (start, end)
                 num_filter = bokeh_mdl.RangeSlider(start=start, end=end, step=step, value=value, width=800, title=title, height_policy=height_policy, **kwargs)
 
+        self.filter_col_map[num_filter] = (numeric_name, filter_mode)
+        
         if callback_class is None:
-            class Callback(callbacks.BokehFilters):
+            class Callback(callbacks_v3.BokehFilters):
                 def __init__(self, vsn_instance, widget):
                     super().__init__(vsn_instance, widget)
                     self.filter_op = ALLOWED_FILTER_OPERATORS[filter_mode]
@@ -1139,16 +1149,19 @@ class st_visualizer:
                         return  # skip
                     
                     self.callback_filter_data()
+                    full_data = self.get_data()
+                    filtered_data = self.vsn_instance.apply_active_filters(full_data)
 
-                    num_value = new
-                    new_pts = self.get_data()
+                    #num_value = new
+                    #new_pts = self.get_data()
 
-                    if filter_mode == 'range':
-                        new_pts = new_pts.loc[new_pts[numeric_name].between(num_value[0], num_value[1], inclusive='both')]
-                    else:
-                        new_pts = new_pts.loc[self.filter_op(new_pts[numeric_name], num_value)]
+                    #if filter_mode == 'range':
+                        #new_pts = new_pts.loc[new_pts[numeric_name].between(num_value[0], num_value[1], inclusive='both')]
+                    #else:
+                        #new_pts = new_pts.loc[self.filter_op(new_pts[numeric_name], num_value)]
             
-                    self.callback_prepare_data(new_pts, self.widget.id==self.vsn_instance.aquire_canvas_data)
+                    #self.callback_prepare_data(new_pts, self.widget.id==self.vsn_instance.aquire_canvas_data)
+                    self.callback_prepare_data(filtered_data)
             
             callback_class = Callback
 
