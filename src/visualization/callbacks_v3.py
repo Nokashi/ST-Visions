@@ -87,7 +87,6 @@ class ST_BokehFilters:
         -----
         This method should be called **last** in any custom callback implementation.
         """
-        # Process the data for visualization
         prepared_data = self.vsn_instance.prepare_data(new_pts)
 
         # Update color mapper factors for categorical coloring
@@ -101,15 +100,8 @@ class ST_BokehFilters:
             )
             self.vsn_instance.cmap['transform'].factors = factors
 
-        # Update the visualization source data
-        self.vsn_instance.source.data = prepared_data.drop(
-            prepared_data.geometry.name, axis=1
-        ).to_dict(orient="list")
+        self.vsn_instance.source.data = prepared_data.drop(prepared_data.geometry.name, axis=1).to_dict(orient="list")
 
     @abc.abstractmethod
     def callback(self, *args):
-        """
-        Abstract callback method for widget-triggered filtering.
-        """
-
         pass

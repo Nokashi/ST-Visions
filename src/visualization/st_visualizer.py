@@ -316,7 +316,9 @@ class st_visualizer:
             self.__set_data(updated_data, self.sp_columns)
             self.prepare_data()
 
-            self.update_filters() 
+            self.update_filters()
+            self.update_colormaps()
+
 
             filtered_batch = self.apply_active_filters(processed_batch)
 
@@ -617,7 +619,7 @@ class st_visualizer:
                 
 
 
-    def add_categorical_colormap(self, palette, categorical_name, **kwargs):
+    def add_categorical_colormap(self, palette, categorical_name, live=False, **kwargs):
         """
         Create a Categorical Colormap. Auto-repeats colors if the number of
         categories exceeds the palette length.
@@ -641,8 +643,15 @@ class st_visualizer:
         if not (isinstance(palette, tuple) or palette in ALLOWED_CATEGORICAL_COLOR_PALLETES):
             logger.error(f'❌ Invalid palette: "{palette}". Must be a tuple or one of the allowed palettes: {ALLOWED_CATEGORICAL_COLOR_PALLETES}')
             raise ValueError(f'Invalid Palette Name/Tuple.')
+        
+        if live:
+            logger.info(f"Creating live categorical colormap for '{categorical_name}' (will auto-update)")
+            categories = ['Loading...']
+        else:
+            categories = sorted(np.unique(self.source.data[categorical_name]).tolist())
 
-        categories = sorted(np.unique(self.source.data[categorical_name]).tolist())
+
+        #categories = sorted(np.unique(self.source.data[categorical_name]).tolist())
         num_categories = len(categories)
 
         if isinstance(palette, tuple):
@@ -662,7 +671,7 @@ class st_visualizer:
         return self.cmap
 
     
-    def add_numerical_colormap(self, palette, numeric_name, val_range=None, nan_color='gray', colorbar=True, cb_orientation='vertical', cb_location='right', label_standoff=12, border_line_color=None, location=(0,0), **kwargs): 
+    def add_numerical_colormap(self, palette, numeric_name, live= False, val_range=None, nan_color='gray', colorbar=True, cb_orientation='vertical', cb_location='right', label_standoff=12, border_line_color=None, location=(0,0), **kwargs): 
         """
         Apply quantitative color mapping to numerical data.
         
@@ -711,8 +720,20 @@ class st_visualizer:
         if not (palette in ALLOWED_NUMERICAL_COLOR_PALETTES or isinstance(palette, palettes.Palette.__origin__)):
             logger.error(f'❌ Invalid palette: "{palette}". Must be a tuple or one of the allowed palettes: {ALLOWED_NUMERICAL_COLOR_PALETTES}')          
             raise ValueError(f'Invalid Palette.')
+        
+        if live:
+            logger.info(f"Creating live numerical colormap for '{numeric_name}' (will auto-update)")
+            min_val, max_val = val_range if val_range is not None else (0, 1)  # Default placeholder
+    
+        # Static mode: use data or provided range
+        else:
+            if self.data is None or numeric_name not in self.data.columns:
+                raise ValueError(f"Cannot create colormap: column '{numeric_name}' not found in data")
+        
+            min_val, max_val = self.data[numeric_name].agg(['min', 'max']) if val_range is None else val_range
 
-        min_val, max_val = self.data[numeric_name].agg(['min', 'max']) if val_range is None else val_range
+
+        #min_val, max_val = self.data[numeric_name].agg(['min', 'max']) if val_range is None else val_range
         cmap = bokeh_mdl.LinearColorMapper(
             palette=getattr(palettes, palette) if palette in ALLOWED_NUMERICAL_COLOR_PALETTES else palette, 
             low=min_val, 
@@ -1238,6 +1259,32 @@ class st_visualizer:
                 with suppress_bokeh_callbacks(widget):
                     widget.start = start
                     widget.end = end
+        
+    def update_colormaps(self):
+        if self.cmap is not None and self.data is not None and not self.data.empty:
+            field_name = self.cmap.get('field')
+            cmap_transform = self.cmap.get('transform')
+            
+            if field_name and field_name in self.data.columns:
+
+                if hasattr(cmap_transform, 'low'):  # Numerical colormap
+                    new_min = self.data[field_name].min()
+                    new_max = self.data[field_name].max()
+                    
+                    # Only update if range changed
+                    if new_min != cmap_transform.low or new_max != cmap_transform.high:
+                        cmap_transform.low = new_min
+                        cmap_transform.high = new_max
+                        logger.debug(f"Updated numerical colormap range: {field_name} = {new_min:.2f} to {new_max:.2f}")
+                
+                elif hasattr(cmap_transform, 'factors'):  # Categorical colormap
+                    new_categories = sorted(self.data[field_name].dropna().unique().tolist())
+                    old_categories = cmap_transform.factors
+                    
+                    # Only update if categories changed
+                    if set(new_categories) != set(old_categories):
+                        cmap_transform.factors = new_categories
+                        logger.debug(f"Updated categorical colormap: {field_name} = {len(new_categories)} categories")
 
     
     def apply_active_filters(self, df):
