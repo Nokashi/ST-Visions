@@ -29,8 +29,8 @@ from bokeh.layouts import column, row
 # Importing Helper Libraries
 sys.path.append(os.path.join(os.path.dirname(__file__)))
 import geom_helper
-import callbacks
-import callbacks_v3
+#import callbacks
+import filter_callbacks
 import providers
 
 
@@ -85,6 +85,7 @@ class st_visualizer:
         self._stream = None
         self.is_centered_on_data = False
         self.padding = None
+        self.palette = None
         self.filter_col_map = {}
 
         logger.info(f"VISIONS instance initialized with limit={limit}, target_crs={target_crs}")
@@ -667,6 +668,7 @@ class st_visualizer:
         # Create the CategoricalColorMapper instance
         cmap = bokeh_mdl.CategoricalColorMapper(palette=full_palette, factors=categories, **kwargs)
         self.cmap = {'field': categorical_name, 'transform': cmap}
+        self.palette = palette
 
         return self.cmap
 
@@ -995,7 +997,7 @@ class st_visualizer:
 
         # Set up callback mechanism
         if callback_class is None:
-            class Callback(callbacks_v3.ST_BokehFilters):
+            class Callback(filter_callbacks.ST_BokehFilters):
                 def __init__(self, vsn_instance, widget):
                     super().__init__(vsn_instance, widget)
                 
@@ -1068,7 +1070,7 @@ class st_visualizer:
         self.filter_col_map[cat_filter] = (categorical_name, None)
 
         if callback_class is None:
-            class Callback(callbacks_v3.ST_BokehFilters):
+            class Callback(filter_callbacks.ST_BokehFilters):
                 def __init__(self, vsn_instance, widget):
                     super().__init__(vsn_instance, widget)
                 
@@ -1158,7 +1160,7 @@ class st_visualizer:
         self.filter_col_map[num_filter] = (numeric_name, filter_mode)
         
         if callback_class is None:
-            class Callback(callbacks_v3.ST_BokehFilters):
+            class Callback(filter_callbacks.ST_BokehFilters):
                 def __init__(self, vsn_instance, widget):
                     super().__init__(vsn_instance, widget)
                     self.filter_op = ALLOWED_FILTER_OPERATORS[filter_mode]
@@ -1254,12 +1256,13 @@ class st_visualizer:
                 start = ts.min()
                 end = ts.max()
 
-                logger.info((start, end, start < end))
+                # logger.info((start, end, start < end))
 
                 with suppress_bokeh_callbacks(widget):
                     widget.start = start
                     widget.end = end
-        
+
+    #TODO: Investigate Factor mapping to persist color during selection (Medium Priority)
     def update_colormaps(self):
         if self.cmap is not None and self.data is not None and not self.data.empty:
             field_name = self.cmap.get('field')
@@ -1277,14 +1280,37 @@ class st_visualizer:
                         cmap_transform.high = new_max
                         logger.debug(f"Updated numerical colormap range: {field_name} = {new_min:.2f} to {new_max:.2f}")
                 
-                elif hasattr(cmap_transform, 'factors'):  # Categorical colormap
-                    new_categories = sorted(self.data[field_name].dropna().unique().tolist())
-                    old_categories = cmap_transform.factors
+            if hasattr(cmap_transform, 'factors'):  # Categorical
+                # Get ALL unique categories from data
+                #palette = self.cmap.get('palette')
+                all_categories = sorted(self.data[field_name].dropna().unique().tolist())
+                old_categories = cmap_transform.factors
+                
+                merged_categories = list(old_categories)  # Start with existing
+                
+                for cat in all_categories:
+                    if cat not in merged_categories:
+                        merged_categories.append(cat)  # Add new ones at end
+                
+                # Only update if categories changed
+                if set(merged_categories) != set(old_categories):
+                    cmap_transform.factors = merged_categories
+                    logger.info(f"Updated categorical colormap: {len(merged_categories)} categories")
                     
-                    # Only update if categories changed
-                    if set(new_categories) != set(old_categories):
-                        cmap_transform.factors = new_categories
-                        logger.debug(f"Updated categorical colormap: {field_name} = {len(new_categories)} categories")
+                    # Update palette to match new category count
+                    self._update_categorical_palette(cmap_transform, len(merged_categories))
+
+    def _update_categorical_palette(self, color_mapper, num_categories):
+        """
+        Regenerate palette to match new category count.
+        """
+        available_sizes = getattr(palettes, self.palette).keys()
+        max_size = max(available_sizes)
+        base_colors = getattr(palettes, self.palette)[max_size]
+        
+        full_palette = list(itertools.islice(itertools.cycle(base_colors), num_categories))
+        
+        color_mapper.palette = full_palette
 
     
     def apply_active_filters(self, df):

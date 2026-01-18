@@ -1,6 +1,11 @@
+"""
+    filter_callbacks.py - v2025.05.18
+
+    Authors: Paraschos Moraitis, Andreas Tritsarolis
+"""
+
 import abc
 import bokeh.models as bokeh_mdl
-
 
 class ST_BokehFilters:
     __metaclass__ = abc.ABCMeta
@@ -77,11 +82,6 @@ class ST_BokehFilters:
     def callback_prepare_data(self, new_pts):
         """
         Prepare filtered data for visualization rendering.
-        
-        Parameters
-        ----------
-        new_pts : pandas.DataFrame or geopandas.GeoDataFrame
-            Filtered dataset to prepare for visualization.
         
         Notes
         -----
