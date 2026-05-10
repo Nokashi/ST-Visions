@@ -54,8 +54,7 @@ class ST_AbstractStream(ABC):
     ST_KafkaStream : Kafka-specific implementation.
     """
 
-    def __init__(self, topic_name: str):
-        self.topic = topic_name
+    def __init__(self):
         self.consumer = None
         self._thread = None
         self._stop = False
@@ -230,11 +229,14 @@ class ST_KafkaStream(ST_AbstractStream):
     Automatically starts consuming upon initialization.
     """
 
-    def __init__(self, topic_name="default-topic", bootstrap_servers="localhost:9092", group_id="stream-group", max_queue_size = 10000):
-        super().__init__(topic_name)
+    def __init__(self, topic_name="default-topic", bootstrap_servers="localhost:9092", group_id="stream-group", max_queue_size = 10000, lon_field="lon", lat_field="lat"):
+        super().__init__()
+        self.topic = topic_name
         self.bootstrap_servers = bootstrap_servers
         self.group_id = group_id
         self.max_queue_size = max_queue_size
+        self.lon_field = lon_field   # moved back in from earlier
+        self.lat_field = lat_field
 
         self._assert_topic()
         self.start()
@@ -343,8 +345,8 @@ class ST_KafkaStream(ST_AbstractStream):
         for tp, messages in msg_pack.items():
             for msg in messages:
                 value = msg.value
-                lon = value.get("lon")
-                lat = value.get("lat")
+                lon = value.get(self.lon_field)
+                lat = value.get(self.lat_field)
 
                 if lon is None or lat is None:
                     continue
