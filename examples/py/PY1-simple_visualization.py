@@ -15,7 +15,7 @@ env = os.environ
 # python -m bokeh serve --show data/scripts/PY1-simple_visualization.py
 
 
-st_viz = st_visualizer(limit=5000) # Initialize a VISIONS Instance (ST Visualizer Object)
+st_viz = st_visualizer(limit=10000) # Initialize a VISIONS Instance (ST Visualizer Object)
 st_viz.get_data_csv(filepath=env['SARONIC_GULF_AIS'], nrows=10000)
 
 st_viz.create_canvas(title=f'Simple Visualization', tile_provider="CARTODBPOSITRON", sizing_mode='fixed', height=800, tools="pan, box_zoom, lasso_select, wheel_zoom, hover, save, reset", width = 800)
@@ -32,7 +32,7 @@ st_viz.figure.legend.location = "top_left"
 st_viz.figure.legend.click_policy = "mute"
 st_viz.figure.toolbar.active_scroll = st_viz.figure.select_one(WheelZoomTool)
 
-st_viz.add_temporal_filter(temporal_name='t', temporal_unit='ms', step_ms=180000, title='Temporal Horizon')
+#st_viz.add_temporal_filter(temporal_name='t', temporal_unit='ms', step_ms=180000, title='Temporal Horizon')
 
 #description = Div(text="""
 #<h3>Python Example 1</h3>

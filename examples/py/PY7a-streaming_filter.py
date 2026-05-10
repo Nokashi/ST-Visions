@@ -21,13 +21,20 @@ expected_schema = pa.schema([
 
 
 st_viz = st_visualizer(limit=5000, expected_schema=expected_schema) # Initialize a VISIONS Instance (ST Visualizer Object)
-st_viz.create_canvas(title=f'Showing Streaming Data', tile_provider="CARTODBPOSITRON", sizing_mode='scale_width', height=540, tools="pan, box_zoom, lasso_select, wheel_zoom, hover, save, reset")
+
+st_viz.create_canvas(
+    title="Showing Streaming Data",
+    tile_provider="CARTODBPOSITRON",
+    sizing_mode='fixed',
+    width=1600,
+    height=800,
+    tools="pan, box_zoom, lasso_select, wheel_zoom, hover, save, reset"
+)
+
 circ = st_viz.add_marker(marker='circle', size=10, color='royalblue', alpha=0.7, fill_alpha=0.5, muted_alpha=0, legend_label=f'Vessel GPS Locations')
 
-
 stream = ST_KafkaStream(topic_name='st-viz-topic')
-st_viz.get_data_stream(stream=stream, notebook=False, refresh_rate=500)
-
+st_viz.get_data_stream(stream=stream, notebook=False, refresh_rate=250)
 
 tooltips = [('Vessel ID','@vessel_id'), ('Timestamp','@t'), ('Speed (knots)','@speed'),
             ('Course over Ground (degrees)','@course'), ('Heading (degrees)','@heading'), ('Coordinates','(@lon_merc, @lat_merc)')]
@@ -42,4 +49,4 @@ st_viz.figure.legend.location = "top_left"
 st_viz.figure.legend.click_policy = "mute"
 st_viz.figure.toolbar.active_scroll = st_viz.figure.select_one(bokeh_models.WheelZoomTool)
 
-st_viz.show_figures(notebook=False, live=True, height=600, width=600, sizing_mode='stretch_both')
+st_viz.show_figures(notebook=False, live=True, sizing_mode='fixed')

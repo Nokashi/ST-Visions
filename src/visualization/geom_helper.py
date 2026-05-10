@@ -269,54 +269,6 @@ def classify_area_proximity(trajectories, spatial_areas, compensate=False, buffe
 
     return trajectories
 
-def classify_area_proximity_bulk(
-    trajectories,
-    spatial_areas,
-    compensate=False,
-    buffer_amount=1e-14,
-    verbose=True,
-):
-    """
-    Classify Point Geometries according to their Spatial Proximity
-    to one (or many) Spatial Area(s), using Shapely STRtree.query_bulk.
-    """
-    trajectories = trajectories.copy()
-    trajectories["area_id"] = None
-
-    if verbose:
-        logger.info("Preparing geometries...")
-
-    # Prepare point geometries (tree is built on points)
-    point_geoms = trajectories.geometry.values
-    tree = STRtree(point_geoms)
-
-    # Prepare area geometries
-    if compensate:
-        area_geoms = spatial_areas.geometry.buffer(buffer_amount).buffer(0).values
-    else:
-        area_geoms = spatial_areas.geometry.values
-
-    if verbose:
-        logger.info("Running bulk spatial query...")
-
-    # Bulk query: areas vs points
-    area_pos, point_pos = tree.query(
-        area_geoms,
-        predicate="intersects",
-    )
-
-    if len(area_pos) == 0:
-        return trajectories
-
-    # Map positional indices back to GeoDataFrame indices
-    area_ids = spatial_areas.index.values[area_pos]
-    traj_ids = trajectories.index.values[point_pos]
-
-    # Assign area_id (last match wins, same as original behavior)
-    trajectories.loc[traj_ids, "area_id"] = area_ids
-
-    return trajectories
-
 
 
 def quadrat_cut_geometry(geometry, quadrat_width, min_num=3, buffer_amount=1e-9):

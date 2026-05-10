@@ -223,16 +223,6 @@ class ST_KafkaStream(ST_AbstractStream):
     group_id : str
         Consumer group ID for Kafka.
     
-    Examples
-    --------
-    >>> from src.streaming.st_vizstream import ST_KafkaStream
-    >>> # Stream GPS data from Kafka
-    >>> stream = ST_KafkaStream(
-    ...     topic_name="vehicle-gps",
-    ...     bootstrap_servers="localhost:9092",
-    ...     group_id="visualization-consumer"
-    ... )
-    
     Notes
     -----
     Requires `kafka-python` package. Messages must be JSON-encoded with

@@ -17,7 +17,7 @@ def simulate_kafka_stream(
     key_field=None,
     delay=0.01
 ):
-    df = pd.read_csv(csv_path).head(20000)
+    df = pd.read_csv(csv_path).head(100000)
     logger.info(f"Loaded CSV: {len(df)} rows. Streaming to '{topic}'...")
 
     producer = KafkaProducer(
@@ -25,7 +25,7 @@ def simulate_kafka_stream(
         value_serializer=lambda v: json.dumps(v).encode("utf-8"),
     )
 
-    records = df.to_dict(orient="records")  #TODO: orient(list)
+    records = df.to_dict(orient="records") 
     for record in records:
         producer.send(topic, value=record)
         logger.info(f"[KAFKA PRODUCER] Sending the following:  {record}")

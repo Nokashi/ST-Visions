@@ -90,6 +90,7 @@ class st_visualizer:
 
         logger.info(f"VISIONS instance initialized with limit={limit}, target_crs={target_crs}")
         # self._arrow_cache = None
+
     
 
     def __set_data(self, data, columns):
@@ -108,7 +109,6 @@ class st_visualizer:
         self.data = data
         self.sp_columns = columns
 
-    #TODO: conditional for streaming support (is instance etc etc etc)
     def set_data(self, data, source_crs=4326):
         """
         Loading a Dataset to a VISIONS instance.
@@ -303,14 +303,14 @@ class st_visualizer:
             Core streaming callback function executed on each refresh cycle.
             
             """
+
             batch_table = fetch_data()
             if batch_table is None:
                 return
-
+            
             combined_table = append_to_cache(batch_table)
             batch_df = batch_table.to_pandas()
             data_df = combined_table.to_pandas()
-
             processed_batch = process_batch(batch_df)
             updated_data = process_batch(data_df)
 
@@ -328,9 +328,6 @@ class st_visualizer:
             if self.source is not None:
                 valid_cols = set(self.source.data.keys())
                 stream_dict = {k: v for k, v in stream_dict.items() if k in valid_cols}
-
-
-                #TODO: Check interaction with a filter
                 self.source.stream(stream_dict, rollover=self.limit)
                 # logger.info("Streamed batch")
             else:
@@ -372,8 +369,7 @@ class st_visualizer:
 
                 self.is_centered_on_data = True
                 # logger.info(f"dynamically bounded to first batch data: X({x_min},{x_max}) Y({y_min},{y_max})")
-                
-
+            
             if notebook:
                 try:
                     # Only push if the handle exists
@@ -384,6 +380,7 @@ class st_visualizer:
                 except Exception as e:
                     logger.warning(f"Notebook update failed: {e}")
 
+            
         if notebook:
             def notebook_periodic_callback():
                 """

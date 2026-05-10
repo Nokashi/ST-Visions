@@ -8,7 +8,7 @@ sys.path.append(os.path.abspath('../../src'))
 from visualization.st_visualizer import st_visualizer
 from streaming.st_vizstream import ST_KafkaStream
 
-os.environ["BOKEH_ALLOW_WS_ORIGIN"] = "*"
+#os.environ["BOKEH_ALLOW_WS_ORIGIN"] = "*"
 
 expected_schema = pa.schema([
     ("lon", pa.float64()),
@@ -20,14 +20,14 @@ expected_schema = pa.schema([
     ("t", pa.timestamp('ms'))
 ])
 
-st_viz = st_visualizer(limit=5000, expected_schema=expected_schema)
+st_viz = st_visualizer(limit=7500, expected_schema=expected_schema)
 
 st_viz.create_canvas(
     title="Showing Streaming Data",
     tile_provider="CARTODBPOSITRON",
-    sizing_mode='stretch_both',
-    width=800,
-    height=600,
+    sizing_mode='fixed',
+    width=1600,
+    height=800,
     tools="pan, box_zoom, lasso_select, wheel_zoom, hover, save, reset"
 )
 
@@ -42,7 +42,7 @@ st_viz.add_marker(
 )
 
 stream = ST_KafkaStream(topic_name='st-viz-topic')
-st_viz.get_data_stream(stream=stream, notebook=False, refresh_rate=50)
+st_viz.get_data_stream(stream=stream, notebook=False, refresh_rate=250)
 
 
 tooltips = [
@@ -59,4 +59,4 @@ st_viz.figure.legend.location = "top_left"
 st_viz.figure.legend.click_policy = "mute"
 st_viz.figure.toolbar.active_scroll = st_viz.figure.select_one(bokeh_models.WheelZoomTool)
 
-st_viz.show_figures(notebook=False, live=True, sizing_mode='stretch_both')
+st_viz.show_figures(notebook=False, live=True, sizing_mode='fixed')

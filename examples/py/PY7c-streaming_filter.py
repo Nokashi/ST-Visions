@@ -17,8 +17,7 @@ expected_schema = pa.schema([
     ("speed", pa.float32()),
     ("course", pa.float32()),
     ("heading", pa.float32()),
-    ("t", pa.timestamp('ms')),
-    ("vessel_type", pa.string())
+    ("t", pa.timestamp('ms'))
 ])
 
 
@@ -31,11 +30,10 @@ st_viz.create_canvas(
     height=800,
     tools="pan, box_zoom, lasso_select, wheel_zoom, hover, save, reset"
 )
-
 #circ = st_viz.add_marker(marker='circle', size=10, color='royalblue', alpha=0.7, fill_alpha=0.5, muted_alpha=0, legend_label=f'Vessel GPS Locations')
 
-st_viz.add_categorical_colormap(live=True, palette='Category20b', categorical_name='vessel_type')
-_ = st_viz.add_marker(marker='circle', color=st_viz.cmap, alpha=1, legend_group='vessel_type')
+st_viz.add_numerical_colormap(live=True, palette='Viridis256', numeric_name='speed')
+_ = st_viz.add_marker(marker='circle', color=st_viz.cmap, alpha=1, legend_group='speed')
 
 
 
@@ -48,8 +46,8 @@ st_viz.get_data_stream(stream=stream, notebook=False, refresh_rate=500)
 tooltips = [('Vessel ID','@vessel_id'), ('Timestamp','@t'), ('Speed (knots)','@speed'),
             ('Course over Ground (degrees)','@course'), ('Heading (degrees)','@heading'), ('Coordinates','(@lon_merc, @lat_merc)'), ('Vessel Type','@vessel_type')]
 
-st_viz.add_categorical_filter(title='Vessel Type', categorical_name='vessel_type', live=True)
-#st_viz.add_numerical_filter(title='Speed (knots)', live=True, filter_mode='range', numeric_name='speed', step=1, callback_policy='value_throttled')
+#st_viz.add_categorical_filter(title='Vessel Type', categorical_name='vessel_type', live=True)
+st_viz.add_numerical_filter(title='Speed (knots)', live=True, filter_mode='range', numeric_name='speed', step=1, callback_policy='value_throttled')
 st_viz.add_hover_tooltips(tooltips)
 st_viz.add_lasso_select()
 
