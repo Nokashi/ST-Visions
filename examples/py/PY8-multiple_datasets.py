@@ -2,20 +2,17 @@ import os, sys
 from dotenv import load_dotenv
 load_dotenv("..\.env")
 env = os.environ
-
 import pandas as pd
-import geopandas as gpd
-import shapely
-import numpy as np
 import bokeh.models as bkhm
-import bokeh.colors as bokeh_colors
+sys.path.append(os.path.abspath('../../src')) 
 
-sys.path.append(os.path.abspath('../../src')) # Ideally ST_Visions will be installed as a module, therefore this is more of a development setting for quick testing.
+# TO EXECUTE SCRIPT USE (ON REMOTE SERVER)
+# python -m bokeh serve --show examples/py/PY8-multiple_datasets.py --allow-websocket-origin=<NODE_IP_ADDRESS>:<BOKEH_PORT>
+
+# TO EXECUTE SCRIPT USE (ON LOCAL SERVER)
+# python -m bokeh serve --show examples/py/PY8-multiple_datasets.py
 
 from visualization.st_visualizer import st_visualizer
-import express.st_vizexpress as viz_express
-import visualization.callbacks as viz_callbacks
-import visualization.geom_helper as viz_helper
 
 pd.set_option('display.expand_frame_repr', False)
 pd.set_option('display.max_rows', 10)
@@ -26,7 +23,7 @@ pd.set_option('display.max_colwidth', None)
 
 st_viz = st_visualizer(limit=500)
 st_viz.get_data_csv(env['SARONIC_GULF_AIS'], nrows=1000)
-st_viz.create_canvas(title=f'Prototype Plot', sizing_mode='scale_width', height=540, tools="pan, box_zoom, lasso_select, wheel_zoom, hover, save, reset")
+st_viz.create_canvas(title=f'Prototype Plot', sizing_mode='fixed', height=800, width=1600, tools="pan, box_zoom, lasso_select, wheel_zoom, hover, save, reset")
 st_viz.add_marker(marker='circle', size=10, color='royalblue', alpha=0.5, fill_alpha=0.5, muted_alpha=0, legend_label=f'GPS Locations A')
 st_viz.add_hover_tooltips(tooltips = [('Vessel ID','@vessel_id'), ('Coordinates','(@lon, @lat)')], renderers=st_viz.renderers)
 

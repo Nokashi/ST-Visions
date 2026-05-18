@@ -8,13 +8,17 @@ from dotenv import load_dotenv
 load_dotenv("..\.env")
 env = os.environ
 
-
-
 pd.set_option('display.expand_frame_repr', False)
 pd.set_option('display.max_rows', 10)
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', None)
 pd.set_option('display.max_colwidth', None)
+
+# TO EXECUTE SCRIPT USE (ON REMOTE SERVER)
+# python -m bokeh serve --show examples/py/PY5-data_table.py --allow-websocket-origin=<NODE_IP_ADDRESS>:<BOKEH_PORT>
+
+# TO EXECUTE SCRIPT USE (ON LOCAL SERVER)
+# python -m bokeh serve --show examples/py/PY5-data_table.py
 
 data_points = st_visualizer(limit=5000) # Initialize a VISIONS Instance (ST Visualizer Object)
 data_points.get_data_csv(filepath=env['SARONIC_GULF_AIS'], nrows=10000)
@@ -24,7 +28,7 @@ tooltips = [('Vessel ID','@vessel_id'), ('Timestamp','@t'), ('Speed (knots)','@s
             ('Course over Ground (degrees)','@course'), ('Heading (degrees)','@heading'), 
             ('Coordinates','(@lon, @lat)')]
 
-data_points.create_canvas(title=f'Simple Visualization', tile_provider="CARTODBPOSITRON", sizing_mode='stretch_both', height=600, tools="pan, box_zoom, lasso_select, wheel_zoom, hover, save, reset")
+data_points.create_canvas(title=f'Simple Visualization', tile_provider="CARTODBPOSITRON", sizing_mode='stretch_both', height=800, tools="pan, box_zoom, lasso_select, wheel_zoom, hover, save, reset")
 circ = data_points.add_marker(marker='circle', size=10, color='royalblue', alpha=0.7, fill_alpha=0.5, muted_alpha=0, legend_label=f'Vessel GPS Locations')
 data_points.add_hover_tooltips(tooltips)
 data_points.add_lasso_select()

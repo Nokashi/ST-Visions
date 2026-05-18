@@ -30,7 +30,7 @@ def concatPolyCoords(polyCoords):
 	  * each polygon is a list with one exterior and zero or more holes
 	  * each exterior/hole is a list of coordinates
 	
-	From: https://stackoverflow.com/a/56462957
+	From: https://stackoverflow.com/a/56462957 
 	"""
     return [[[p['exterior'], *p['holes']] for p in mp] for mp in polyCoords]
 
@@ -147,7 +147,6 @@ def getCoords(geom, coord_index, complex_geom=False):
     gtype = geom.geom_type
     
 	# "Normal" geometries
-	# -------------------
     if gtype == "Point":
         return getPointCoords(geom, coord_index)[0]
     elif gtype == "LineString":
@@ -160,7 +159,6 @@ def getCoords(geom, coord_index, complex_geom=False):
             return poly_coords
     
 	# Multi geometries
-	# ----------------
     else:
         return multiGeomHandler(geom, coord_index, gtype, complex_geom)
 

@@ -1,16 +1,10 @@
-# ST_Visions+ (Name Tentative)
-### A fork of ST_Visions focused on Modernization and Online Analytics Feature Extention.
+# ST_Visions
+### A Python-based library for interactive spatio-temporal data visualization.
+
 
 ## Overview
 ---
-Built on the already existing [ST_Visions](https://github.com/DataStories-UniPi/ST-Visions) library (**S**patio-**T**emporal **Vis**ualizat**ions**) (Tritsarolis et al.), ST_Visions+ (Name Tentative) aims to Improve, Modernize and expand on the capabilities of the existing implementation, with respect to todays needs for clear Visual Analytics and Data Visualization. Work on the Library has two main pillars
-
-- Modernization of the library to match the cutting edge versions of all the dependecies needed
-- Further Implementation of important features for the modern Data Science space, such as Datastream visualization in real time, and additional Visual Analytics capabilities
-
-Work on this Fork is done as part of the following BSc Thesis 
-
-**ST_Visions+: Extending the ST_Visions Library for Real-Time Visual Analytics**. Paraschos Moraitis
+ST_Visions (**S**patio-**T**emporal **Vis**ualizat**ions**) is a python library, able to interactively visualize spatio-temporal data in a quick-and-easy way. Based upon the functionality of [Bokeh](https://docs.bokeh.org/en/latest/index.html#), and further extending it, we are able to create powerful and cohesive visualizations (and/or online dashboards), for large or streaming spatio-temporal datasets.
 
 
 ## Installation
@@ -30,46 +24,134 @@ conda install --file requirements.txt
 ---
 ST_Visions can be used in two variations, depending on the use-case. For baseline visualizations, the module ```express.py``` provides 3 methods for visualizing Point, (Multi)Polygon and (Multi)Line datasets, respectively. For example, to visualize a Point geometry dataset:
 
-* Using the ```st_visualizer.py``` module: 
+* Using ```st_visualizer.py``` module: 
 
 ```Python
-import st_visions.st_visualizer as viz
+import pandas as pd
+from visualization.st_visualizer import st_visualizer
 
-# Initialize an ST_Visions Instance
-plot = viz.st_visualizer()
+# Load Dataset (Pandas DataFrame)
+data = pd.read_csv("<PATH-TO-CSV-FILE>")
 
-# Load Dataset
-plot.get_data_csv("<PATH-TO-CSV-FILE>")
+# Create a ST_Visions Instance
+plot = st_visualizer()
+
+# Load the dataset into the instance
+plot.set_data(data)
 
 # Create the canvas of the instance
-plot.create_canvas(title=f'Prototype Plot', sizing_mode='fixed', height=540)
-
+plot.create_canvas(title=f'Prototype Plot', tile_provider="CARTODBPOSITRON", sizing_mode='scale_width', plot_height=540)
 
 # Visualize the points to the canvas 
-__ = plot.add_glyph(marker='circle', size=10, color='royalblue', alpha=0.7, fill_alpha=0.5, muted_alpha=0, legend_label=f'Vessel GPS Locations')
+_ = plot.add_marker(glyph_type='circle', size=10, color='royalblue', alpha=0.7, fill_alpha=0.6, muted_alpha=0, legend_label=f'Vessel GPS Locations')
 
 # Set WheelZoomTool as the active scroll tool
 plot.figure.toolbar.active_scroll = plot.figure.select_one(viz.WheelZoomTool)
 ```
 
-* Using the ```express.py``` module: 
+* Using ```st_vizexpress.py``` module: 
 
 ```Python
 import pandas as pd
-import st_visions.st_visualizer as viz
-import st_visions.express as viz_express
+from visualization.st_visualizer import st_visualizer
+import express.st_vizexpress as viz_express
 
-# Initialize an ST_Visions Instance
+# Load Dataset (Pandas DataFrame)
+data = pd.read_csv("<PATH-TO-CSV-FILE>")
+
+# Create an ST_Visions Instance
 plot = viz.st_visualizer()
 
-# Load Dataset
-plot.get_data_csv("<PATH-TO-CSV-FILE>")
+# Load the dataset into the instance
+plot.set_data(data)
 
 # Visualize data on the map
 viz_express.plot_points_on_map(plot)
 ```
 
-Finally, to show our figure, the ```show_figures``` method is used. Depending on the use-case, figures can be visualized either within a Jupyter Notebook cell or a Browser Window (as a Python Script).
+ST_Visions can also be used to hook into a data stream and visualize the receiving data in real time using the ```st_vizstream.py``` module.
+
+* Using the ```ST_KafkaStream``` subclass to subscribe to a Kafka topic
+```Python
+
+import pyarrow as pa
+from visualization.st_visualizer import st_visualizer 
+from streaming.st_vizstream import ST_KafkaStream 
+
+# Initialize the schema we expect to receive from the data stream
+expected_schema = pa.schema([
+    ("lon", pa.float64()),
+    ("lat", pa.float64()),
+    ("vessel_id", pa.int64()),
+    ("speed", pa.float32()),
+    ("course", pa.float32()),
+    ("heading", pa.float32()),
+    ("t", pa.timestamp('ms'))
+])
+
+# Create an ST_Visions Instance
+stream_plot = st_visualizer(limit=7500, expected_schema=expected_schema) 
+
+# Prime the canvas to await the data stream 
+stream_plot.create_canvas(
+    title="Showing Streaming Data",
+    tile_provider="CARTODBPOSITRON",
+    sizing_mode='fixed',
+    width=1600,
+    height=800,
+    tools="pan, box_zoom, lasso_select, wheel_zoom, hover, save, reset"
+)
+
+# Visualize the points to the canvas 
+stream_plot.add_marker(
+    marker='circle',
+    size=10,
+    color='royalblue',
+    alpha=0.7,
+    fill_alpha=0.5,
+    muted_alpha=0,
+    legend_label='Vessel GPS Locations'
+)
+
+# Create an ST_KafkaStream instance subscribed to your topic of choice
+stream = ST_KafkaStream(topic_name='st-viz-topic')
+
+# Hook into the data stream 
+stream_plot.get_data_stream(stream=stream, notebook=False, refresh_rate=250)
+
+# Set WheelZoomTool as the active scroll tool
+stream_plot.figure.toolbar.active_scroll = plot.figure.select_one(viz.WheelZoomTool)
+
+```
+
+* Using ```st_vizexpress.py``` module
+
+```Python
+
+from visualization.st_visualizer import st_visualizer
+import express.st_vizexpress as viz_express
+import pyarrow as pa
+
+# Initialize the schema we expect to receive from the data stream
+expected_schema = pa.schema([
+    ("lon", pa.float64()),
+    ("lat", pa.float64()),
+    ("vessel_id", pa.int64()),
+    ("speed", pa.float32()),
+    ("course", pa.float32()),
+    ("heading", pa.float32()),
+    ("t", pa.timestamp('ms'))
+])
+
+# Create an ST_Visions Instance
+stream_plot = st_visualizer(limit=7500, expected_schema=expected_schema)
+
+# Hook into the stream and visualize the ingested data
+viz_express.plot_streaming_data_on_map(st_viz, topic_name='st-viz-topic', tools=['lasso_select'], sizing_mode='fixed', width=1600, tooltips=tooltips)
+
+```
+
+Finally, to show our figure, the ```show_figures``` method is used. Depending on the use-case, figures can be visualized either within a Jupyter Notebook cell or a Browser Window (as a Python Script). In the case of a live stream, the ```live``` flag should be set to true when calling the ```show_figures``` method.
 
 ```Python
 # Render on Jupyter Notebook; or
@@ -77,6 +159,9 @@ plot.show_figures(notebook=True, notebook_url='http://<NOTEBOOK_IP_ADDRESS>:<NOT
 
 # Render on Browser Window (via Python Script)
 plot.show_figures(notebook=False)
+
+# Plotting data received from a stream
+plot.show_figures(notebook=False, live=True)
 ```
 
 ## Documentation

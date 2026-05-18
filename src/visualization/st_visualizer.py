@@ -189,7 +189,7 @@ class st_visualizer:
 
         Parameters
         ----------
-        stream : ST_AbstractStream
+        stream : ST_AbstractStream subclass
             Streaming source instance (Kafka, etc.)
         source_crs : int (default: ``4326``).
             Coordinate reference system of the incoming data.
@@ -207,7 +207,6 @@ class st_visualizer:
         if not hasattr(self, "_arrow_cache"):
             self._arrow_cache = None
 
-        # not on constructor cause im not sure if its the correct way to deal with this 
         if not hasattr(self, "_stop_callback"):
             self._stop_callback = threading.Event()
         else:
@@ -343,12 +342,15 @@ class st_visualizer:
                 x_span = x_max - x_min
                 y_span = y_max - y_min
 
+                if y_span == 0 or x_span == 0:
+                    self.is_centered_on_data = False
+                    return
+
                 # get aspect ratio of plot
                 fig_aspect = self.figure.width / self.figure.height
                 data_aspect_ratio = x_span / y_span
 
                 # Expand y_range or x_range depending on aspect ratio
-                #TODO 
                 if data_aspect_ratio > fig_aspect:
                     new_y_span = x_span / fig_aspect
                     padding = (new_y_span - y_span) / 2
@@ -1131,7 +1133,7 @@ class st_visualizer:
         kwargs.pop('value', None)
 
         if filter_mode not in list(ALLOWED_FILTER_OPERATORS.keys()):
-            logger.error(f' ❌ filter_mode must be one of the following: {list(ALLOWED_FILTER_OPERATORS.keys())}')
+            logger.error(f' filter_mode must be one of the following: {list(ALLOWED_FILTER_OPERATORS.keys())}')
             raise ValueError(f' Invalid Filter Mode.')
         
 
@@ -1259,7 +1261,6 @@ class st_visualizer:
                     widget.start = start
                     widget.end = end
 
-    #TODO: Investigate Factor mapping to persist color during selection (Medium Priority)
     def update_colormaps(self):
         if self.cmap is not None and self.data is not None and not self.data.empty:
             field_name = self.cmap.get('field')
@@ -1275,7 +1276,7 @@ class st_visualizer:
                     if new_min != cmap_transform.low or new_max != cmap_transform.high:
                         cmap_transform.low = new_min
                         cmap_transform.high = new_max
-                        logger.debug(f"Updated numerical colormap range: {field_name} = {new_min:.2f} to {new_max:.2f}")
+                        #logger.debug(f"Updated numerical colormap range: {field_name} = {new_min:.2f} to {new_max:.2f}")
                 
             if hasattr(cmap_transform, 'factors'):  # Categorical
                 # Get ALL unique categories from data
@@ -1283,18 +1284,17 @@ class st_visualizer:
                 all_categories = sorted(self.data[field_name].dropna().unique().tolist())
                 old_categories = cmap_transform.factors
                 
-                merged_categories = list(old_categories)  # Start with existing
+                merged_categories = list(old_categories)
                 
                 for cat in all_categories:
                     if cat not in merged_categories:
-                        merged_categories.append(cat)  # Add new ones at end
+                        merged_categories.append(cat)  # add new categories
                 
-                # Only update if categories changed
+                # update if categories changed
                 if set(merged_categories) != set(old_categories):
                     cmap_transform.factors = merged_categories
-                    logger.info(f"Updated categorical colormap: {len(merged_categories)} categories")
+                    #logger.info(f"Updated categorical colormap: {len(merged_categories)} categories")
                     
-                    # Update palette to match new category count
                     self._update_categorical_palette(cmap_transform, len(merged_categories))
 
     def _update_categorical_palette(self, color_mapper, num_categories):
@@ -1355,7 +1355,7 @@ class st_visualizer:
                 #hi = pd.to_datetime(hi_ms, unit="ms")
 
                 #ts = pd.to_datetime(result[column])
-                logger.info((lo, hi))
+                #logger.info((lo, hi))
 
                 result = result[result[column].between(lo, hi)]
             

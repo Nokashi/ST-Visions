@@ -8,7 +8,12 @@ sys.path.append(os.path.abspath('../../src'))
 from visualization.st_visualizer import st_visualizer
 from streaming.st_vizstream import ST_KafkaStream
 
-#os.environ["BOKEH_ALLOW_WS_ORIGIN"] = "*"
+
+# TO EXECUTE SCRIPT USE (ON REMOTE SERVER)
+# python -m bokeh serve --show examples/py/PY6a-streaming.py --allow-websocket-origin=<NODE_IP_ADDRESS>:<BOKEH_PORT>
+
+# TO EXECUTE SCRIPT USE (ON LOCAL SERVER)
+# python -m bokeh serve --show examples/py/PY6a-streaming.py
 
 expected_schema = pa.schema([
     ("lon", pa.float64()),
@@ -41,6 +46,7 @@ st_viz.add_marker(
     legend_label='Vessel GPS Locations'
 )
 
+# use your own topic or name your topic 'st-viz-topic'
 stream = ST_KafkaStream(topic_name='st-viz-topic')
 st_viz.get_data_stream(stream=stream, notebook=False, refresh_rate=250)
 
@@ -59,4 +65,4 @@ st_viz.figure.legend.location = "top_left"
 st_viz.figure.legend.click_policy = "mute"
 st_viz.figure.toolbar.active_scroll = st_viz.figure.select_one(bokeh_models.WheelZoomTool)
 
-st_viz.show_figures(notebook=False, live=True, sizing_mode='fixed')
+st_viz.show_figures(notebook=False, live=True, sizing_mode='stretch_both')
