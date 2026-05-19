@@ -147,7 +147,7 @@ expected_schema = pa.schema([
 stream_plot = st_visualizer(limit=7500, expected_schema=expected_schema)
 
 # Hook into the stream and visualize the ingested data
-viz_express.plot_streaming_data_on_map(st_viz, topic_name='st-viz-topic', tools=['lasso_select'], sizing_mode='fixed', width=1600, tooltips=tooltips)
+viz_express.plot_streaming_data_on_map(stream_plot, topic_name='st-viz-topic', tools=['lasso_select'], sizing_mode='fixed', width=1600, tooltips=tooltips)
 
 ```
 
