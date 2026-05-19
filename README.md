@@ -22,7 +22,7 @@ conda install --file requirements.txt
 
 ## Usage
 ---
-ST_Visions can be used in two variations, depending on the use-case. For baseline visualizations, the module ```express.py``` provides 3 methods for visualizing Point, (Multi)Polygon and (Multi)Line datasets, respectively. For example, to visualize a Point geometry dataset:
+ST_Visions can be used in two variations, depending on the use-case. For baseline visualizations, the module ```st_vizexpress.py``` provides 4 methods for visualizing Point, (Multi)Polygon, (Multi)Line datasets and data streams, respectively. For example, to visualize a Point geometry dataset:
 
 * Using ```st_visualizer.py``` module: 
 
@@ -40,10 +40,10 @@ plot = st_visualizer()
 plot.set_data(data)
 
 # Create the canvas of the instance
-plot.create_canvas(title=f'Prototype Plot', tile_provider="CARTODBPOSITRON", sizing_mode='scale_width', plot_height=540)
+plot.create_canvas(title=f'Prototype Plot', tile_provider="CARTODBPOSITRON", sizing_mode='scale_width', height=540)
 
 # Visualize the points to the canvas 
-_ = plot.add_marker(glyph_type='circle', size=10, color='royalblue', alpha=0.7, fill_alpha=0.6, muted_alpha=0, legend_label=f'Vessel GPS Locations')
+_ = plot.add_marker(marker='circle', size=10, color='royalblue', alpha=0.7, fill_alpha=0.6, muted_alpha=0, legend_label=f'Vessel GPS Locations')
 
 # Set WheelZoomTool as the active scroll tool
 plot.figure.toolbar.active_scroll = plot.figure.select_one(viz.WheelZoomTool)
