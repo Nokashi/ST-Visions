@@ -1,10 +1,8 @@
 import os, sys
 import pyarrow as pa
 
-sys.path.append(os.path.abspath('../../src'))
-
-from visualization.st_visualizer import st_visualizer
-import express.st_vizexpress as st_express
+from st_visions.visualization.st_visualizer import st_visualizer
+import st_visions.express.st_vizexpress as st_express
 
 # TO EXECUTE SCRIPT USE (ON REMOTE SERVER)
 # python -m bokeh serve --show examples/py/PY6b-streaming_express.py --allow-websocket-origin=<NODE_IP_ADDRESS>:<BOKEH_PORT>
@@ -33,7 +31,7 @@ tooltips = [
 ]
 
 st_viz = st_visualizer(limit=5000, expected_schema=expected_schema)
-st_express.plot_streaming_data_on_map(st_viz, tools=['lasso_select'], sizing_mode='fixed', width=1600, tooltips=tooltips)
+st_express.plot_streaming_data_on_map_kafka(st_viz, tools=['lasso_select'], sizing_mode='fixed', width=1600, tooltips=tooltips)
 st_viz.show_figures(notebook=False, live=True, sizing_mode='stretch_both')
 
 

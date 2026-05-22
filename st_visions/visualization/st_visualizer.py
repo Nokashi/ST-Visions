@@ -27,11 +27,9 @@ from bokeh.models import ColumnDataSource, GeoJSONDataSource, CDSView, HoverTool
 from bokeh.layouts import column, row
 
 # Importing Helper Libraries
-sys.path.append(os.path.join(os.path.dirname(__file__)))
-import geom_helper
-#import callbacks
-import filter_callbacks
-import providers
+from . import geom_helper
+from . import filter_callbacks
+from . import providers
 
 
 # Defining Allowed Values (per use-case)

@@ -6,19 +6,40 @@
 ---
 ST_Visions (**S**patio-**T**emporal **Vis**ualizat**ions**) is a python library, able to interactively visualize spatio-temporal data in a quick-and-easy way. Based upon the functionality of [Bokeh](https://docs.bokeh.org/en/latest/index.html#), and further extending it, we are able to create powerful and cohesive visualizations (and/or online dashboards), for large or streaming spatio-temporal datasets.
 
-
 ## Installation
----
-In order to use ST_Visions in your project, download all necessary modules in your directory of choice via pip or conda, install the class’ dependencies, as the following commands suggest:
 
-```Python
+ST_Visions has been configured to be installed as a package using pip. It is recommended to create a virtual Python environment before installing the library to avoid any dependency conflicts. Depending on your use-case, theres multiple ways to set up the library.
+
+### Install as a package (recommended)
+Installs all dependencies automatically:
+```bash
+pip install git+https://github.com/DataStories-UniPi/ST-Visions.git
+```
+
+### Developer Install
+For contributing or modifying the source code:
+```bash
+git clone https://github.com/DataStories-UniPi/ST-Visions.git
+cd st-visions
+pip install -e .
+```
+
+### Manual Install
+If you prefer to manage dependencies yourself:
+```bash
+git clone https://github.com/DataStories-UniPi/ST-Visions.git
+cd st-visions
+
 # Using pip/virtualenv
 pip install −r requirements.txt
-
 # Using conda
 conda install --file requirements.txt
 ```
-
+Then add the repo root to your path in your script or notebook:
+```python
+import sys
+sys.path.append("/path/to/st-visions")
+```
 
 ## Usage
 ---
@@ -28,7 +49,7 @@ ST_Visions can be used in two variations, depending on the use-case. For baselin
 
 ```Python
 import pandas as pd
-from visualization.st_visualizer import st_visualizer
+from st_visions.visualization.st_visualizer import st_visualizer
 
 # Load Dataset (Pandas DataFrame)
 data = pd.read_csv("<PATH-TO-CSV-FILE>")
@@ -172,6 +193,7 @@ To learn more about ```ST_Visions``` and its capabilities, please consult the te
 ## Contributors
 ---
 Andreas Tritsarolis, Christos Doulkeridis, Yannis Theodoridis and Nikos Pelekis; Data Science Lab., University of Piraeus
+Paraschos Moraitis, Department of Informatics, University of Piraeus
 
 
 ## Acknowledgement

@@ -5,7 +5,7 @@
 '''    
 
 import bokeh.models as bokeh_models
-from streaming.st_vizstream import ST_KafkaStream
+from st_visions.streaming.st_vizstream import ST_KafkaStream
 
 
 def plot_points_on_map(obj, tools=None, tile_provider='CARTODBPOSITRON', marker='circle', size=10, color='royalblue', alpha=0.7, fill_alpha=0.6, muted_alpha=0, legend_label=f'Object GPS Locations', sizing_mode='scale_width', tile_kwargs={}, **kwargs):
@@ -181,7 +181,7 @@ def plot_points_on_map(obj, tools=None, tile_provider='CARTODBPOSITRON', marker=
 
 
 
-def plot_streaming_data_on_map(obj, tools=None, notebook=False, refresh_rate=100, topic_name='st-viz-topic', tile_provider='CARTODBPOSITRON', marker='circle', size=10, color='royalblue', alpha=0.7, fill_alpha=0.6, muted_alpha=0, legend_label=f'Object GPS Locations', sizing_mode='scale_width', tile_kwargs={}, **kwargs):
+def plot_streaming_data_on_map_kafka(obj, tools=None, notebook=False, refresh_rate=100, topic_name='st-viz-topic', tile_provider='CARTODBPOSITRON', marker='circle', size=10, color='royalblue', alpha=0.7, fill_alpha=0.6, muted_alpha=0, legend_label=f'Object GPS Locations', sizing_mode='scale_width', tile_kwargs={}, **kwargs):
     '''
         Express plot for visualizing a real-time streaming Point Geometry Dataset on the map.
         Parameters

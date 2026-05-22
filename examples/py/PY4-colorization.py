@@ -1,14 +1,11 @@
-import sys, os
-
+import os
+from pathlib import Path
 from dotenv import load_dotenv
-load_dotenv("..\.env")
+load_dotenv(Path.cwd().parent / ".env")
 env = os.environ
-sys.path.append(os.path.abspath('../../src'))
-os.environ["BOKEH_ALLOW_WS_ORIGIN"] = "*"
 
-import sys, os
 import bokeh.models as bokeh_models
-from visualization.st_visualizer import st_visualizer
+from st_visions.visualization.st_visualizer import st_visualizer
 
 # TO EXECUTE SCRIPT USE (ON REMOTE SERVER)
 # python -m bokeh serve --show examples/py/PY4-colorization.py --allow-websocket-origin=<NODE_IP_ADDRESS>:<BOKEH_PORT>

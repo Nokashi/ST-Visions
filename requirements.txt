@@ -1,12 +1,12 @@
-Shapely
-tqdm
-bokeh
-pandas
-geopandas
-numpy
-PyYAML
-pyarrow
-kafka-python
-loguru
-python-dotenv
+Shapely==2.1.2
+tqdm==4.67.1
+bokeh==3.8.0
+pandas==2.3.3
+geopandas==1.1.1
+numpy==2.2.6
+PyYAML==6.0.3
+pyarrow==21.0.0
+kafka-python==2.2.15
+loguru==0.7.3
+python-dotenv==1.2.1
 

@@ -1,12 +1,12 @@
-import sys, os
-sys.path.append(os.path.abspath('../../src'))
+import os
+from pathlib import Path
 from dotenv import load_dotenv
-load_dotenv("..\.env")
+load_dotenv(Path.cwd().parent / ".env")
 env = os.environ
 
 from bokeh.models import WheelZoomTool
-from visualization.st_visualizer import st_visualizer
-import express.st_vizexpress as viz_express
+from st_visions.visualization.st_visualizer import st_visualizer
+import st_visions.express.st_vizexpress as viz_express
 
 
 # TO EXECUTE SCRIPT USE (ON REMOTE SERVER)

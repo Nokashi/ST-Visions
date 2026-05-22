@@ -13,3 +13,5 @@ examples/docker_composer
 .venv
 doc/report
 .env
+venv
+st_visions.egg-info/

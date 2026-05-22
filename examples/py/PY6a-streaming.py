@@ -3,10 +3,8 @@ import pyarrow as pa
 from bokeh.io import curdoc
 import bokeh.models as bokeh_models
 
-sys.path.append(os.path.abspath('../../src'))
-
-from visualization.st_visualizer import st_visualizer
-from streaming.st_vizstream import ST_KafkaStream
+from st_visions.visualization.st_visualizer import st_visualizer
+from st_visions.streaming.st_vizstream import ST_KafkaStream
 
 
 # TO EXECUTE SCRIPT USE (ON REMOTE SERVER)

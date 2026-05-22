@@ -1,8 +1,6 @@
-import sys, os
-sys.path.append(os.path.abspath('../../src'))
-
+import os
 from bokeh.models import WheelZoomTool
-from visualization.st_visualizer import st_visualizer
+from st_visions.visualization.st_visualizer import st_visualizer
 from dotenv import load_dotenv
 load_dotenv("..\.env")
 env = os.environ

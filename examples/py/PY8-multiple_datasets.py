@@ -1,10 +1,11 @@
-import os, sys
+import os
+from pathlib import Path
 from dotenv import load_dotenv
-load_dotenv("..\.env")
+load_dotenv(Path.cwd().parent / ".env")
 env = os.environ
+
 import pandas as pd
 import bokeh.models as bkhm
-sys.path.append(os.path.abspath('../../src')) 
 
 # TO EXECUTE SCRIPT USE (ON REMOTE SERVER)
 # python -m bokeh serve --show examples/py/PY8-multiple_datasets.py --allow-websocket-origin=<NODE_IP_ADDRESS>:<BOKEH_PORT>
@@ -12,7 +13,7 @@ sys.path.append(os.path.abspath('../../src'))
 # TO EXECUTE SCRIPT USE (ON LOCAL SERVER)
 # python -m bokeh serve --show examples/py/PY8-multiple_datasets.py
 
-from visualization.st_visualizer import st_visualizer
+from st_visions.visualization.st_visualizer import st_visualizer
 
 pd.set_option('display.expand_frame_repr', False)
 pd.set_option('display.max_rows', 10)

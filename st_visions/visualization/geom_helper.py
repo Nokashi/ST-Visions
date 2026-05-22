@@ -16,7 +16,6 @@ import numpy as np
 from tqdm import tqdm
 import geopandas as gpd
 from loguru import logger
-from shapely.strtree import STRtree
 
 
 def concatPolyCoords(polyCoords):

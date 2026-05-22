@@ -1,12 +1,12 @@
-import sys, os
-sys.path.append(os.path.abspath('../../src'))
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+load_dotenv(Path.cwd().parent / ".env")
+env = os.environ
 
 import pandas as pd
 import bokeh.models as bkhm
-from visualization.st_visualizer import st_visualizer
-from dotenv import load_dotenv
-load_dotenv("..\.env")
-env = os.environ
+from st_visions.visualization.st_visualizer import st_visualizer
 
 pd.set_option('display.expand_frame_repr', False)
 pd.set_option('display.max_rows', 10)
