@@ -7,7 +7,7 @@ from loguru import logger
 from dotenv import load_dotenv
 load_dotenv(".env")
 env = os.environ
-import sys
+import argparse
 
 
 def simulate_kafka_stream(
@@ -37,15 +37,12 @@ def simulate_kafka_stream(
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--mode", choices=["categorical", "numerical"], required=True)
+    parser.add_argument("--topic", default="st-viz-topic")
+    args = parser.parse_args()
 
-    if len(sys.argv) < 2:
-        raise ValueError("Please provide a mode: categorical or numerical")
-
-    mode = sys.argv[1]
-
-    if mode == "categorical":
-        simulate_kafka_stream(env['CATEGORICAL_SUBSET_DEMO_STREAMER'], 'st-viz-topic')
-    elif mode == "numerical":
-        simulate_kafka_stream(env['SARONIC_GULF_AIS_STREAMER'], 'st-viz-topic')
-    else:
-        raise ValueError(f"Unknown mode: {mode}")
+    if args.mode == "categorical":
+        simulate_kafka_stream(env['CATEGORICAL_SUBSET_DEMO_STREAMER'], args.topic)
+    elif args.mode == "numerical":
+        simulate_kafka_stream(env['NUMERICAL_SUBSET_DEMO_STREAMER'], args.topic)

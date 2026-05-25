@@ -973,10 +973,10 @@ class st_visualizer:
         # Static mode: Use data-based range
         else:
             start_date = (pd.to_datetime(self.data[temporal_name].min(), 
-                        unit=temporal_unit) if start_date is None else pd.to_datetime(start_date))
+                        unit=temporal_unit)) if start_date is None else start_date
             
             end_date = (pd.to_datetime(self.data[temporal_name].max(), 
-                    unit=temporal_unit) if end_date is None else pd.to_datetime(end_date))
+                    unit=temporal_unit)) if end_date is None else end_date
 
             temp_filter = bokeh.models.DatetimeRangeSlider(
                 title=title,
@@ -987,7 +987,8 @@ class st_visualizer:
                 format='%d %b %Y %H:%M:%S.%3N',
                 bar_color="royalblue", 
                 min_width= 500,
-                height_policy=height_policy
+                height_policy=height_policy,
+                **kwargs
             )
         
         self.filter_col_map[temp_filter] = (temporal_name, None)
@@ -1316,9 +1317,6 @@ class st_visualizer:
         ----------
         df : pandas.DataFrame 
             Input dataset to filter.
-        widget_subset : list of bokeh.models.Widget or None, optional
-            Specific widgets to apply. If None, applies all widgets.
-            Default is None.
 
         Returns
         -------

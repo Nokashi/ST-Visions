@@ -23,7 +23,7 @@ pd.set_option('display.max_colwidth', None)
 
 
 st_viz = st_visualizer(limit=500)
-st_viz.get_data_csv(env['SARONIC_GULF_AIS'], nrows=1000)
+st_viz.get_data_csv(env['NUMERICAL_SUBSET_DEMO'], nrows=1000)
 st_viz.create_canvas(title=f'Prototype Plot', sizing_mode='fixed', height=800, width=1600, tools="pan, box_zoom, lasso_select, wheel_zoom, hover, save, reset")
 st_viz.add_marker(marker='circle', size=10, color='royalblue', alpha=0.5, fill_alpha=0.5, muted_alpha=0, legend_label=f'GPS Locations A')
 st_viz.add_hover_tooltips(tooltips = [('Vessel ID','@vessel_id'), ('Coordinates','(@lon, @lat)')], renderers=st_viz.renderers)

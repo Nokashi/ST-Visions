@@ -1,6 +1,4 @@
-import os, sys
 import pyarrow as pa
-from bokeh.io import curdoc
 import bokeh.models as bokeh_models
 
 from st_visions.visualization.st_visualizer import st_visualizer

@@ -21,7 +21,7 @@ pd.set_option('display.max_colwidth', None)
 # python -m bokeh serve --show examples/py/PY5-data_table.py
 
 data_points = st_visualizer(limit=5000) # Initialize a VISIONS Instance (ST Visualizer Object)
-data_points.get_data_csv(filepath=env['SARONIC_GULF_AIS'], nrows=10000)
+data_points.get_data_csv(filepath=env['NUMERICAL_SUBSET_DEMO'], nrows=10000)
 
 
 tooltips = [('Vessel ID','@vessel_id'), ('Timestamp','@t'), ('Speed (knots)','@speed'),

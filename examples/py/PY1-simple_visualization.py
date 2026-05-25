@@ -1,8 +1,9 @@
 import os
 from bokeh.models import WheelZoomTool
 from st_visions.visualization.st_visualizer import st_visualizer
+from pathlib import Path
 from dotenv import load_dotenv
-load_dotenv("..\.env")
+load_dotenv(Path.cwd().parent / ".env")
 env = os.environ
 
 # TO EXECUTE SCRIPT USE (ON REMOTE SERVER)
@@ -13,7 +14,7 @@ env = os.environ
 
 
 st_viz = st_visualizer(limit=10000) # Initialize a VISIONS Instance (ST Visualizer Object)
-st_viz.get_data_csv(filepath=env['SARONIC_GULF_AIS'], nrows=10000)
+st_viz.get_data_csv(filepath=env['NUMERICAL_SUBSET_DEMO'], nrows=10000)
 
 st_viz.create_canvas(title=f'Simple Visualization', tile_provider="CARTODBPOSITRON", sizing_mode='fixed', height=800, width=1600, tools="pan, box_zoom, lasso_select, wheel_zoom, hover, save, reset")
 circ = st_viz.add_marker(marker='circle', size=10, color='royalblue', alpha=0.7, fill_alpha=0.5, muted_alpha=0, legend_label=f'Vessel GPS Locations')

@@ -1,6 +1,5 @@
 import pyarrow as pa
 import bokeh.models as bokeh_models
-
 from st_visions.visualization.st_visualizer import st_visualizer
 from st_visions.streaming.st_vizstream import ST_KafkaStream
 

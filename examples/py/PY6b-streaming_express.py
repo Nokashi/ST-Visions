@@ -1,6 +1,4 @@
-import os, sys
 import pyarrow as pa
-
 from st_visions.visualization.st_visualizer import st_visualizer
 import st_visions.express.st_vizexpress as st_express
 

@@ -16,18 +16,18 @@ import st_visions.express.st_vizexpress as viz_express
 # python -m bokeh serve --show examples/py/PY2-numerical_filter.py
 
 st_viz = st_visualizer(limit=5000) # Initialize a VISIONS Instance (ST Visualizer Object)
-st_viz.get_data_csv(filepath=env['SARONIC_GULF_AIS'], nrows=10000)
+st_viz.get_data_csv(filepath=env['NUMERICAL_SUBSET_DEMO'], nrows=10000)
 
 
 tooltips = [('Vessel ID','@vessel_id'), ('Timestamp','@t'), ('Speed (knots)','@speed'),
             ('Course over Ground (degrees)','@course'), ('Heading (degrees)','@heading'), ('Coordinates','(@lon, @lat)')]
 
-viz_express.plot_points_on_map(st_viz, tools=['hover,lasso_select'], tooltips=tooltips, width=1600)
+viz_express.plot_points_on_map(st_viz, tools=['hover,lasso_select'], sizing_mode='fixed', tooltips=tooltips, width=1600)
 
-st_viz.add_numerical_filter(title='Speed (knots)', filter_mode='>=', numeric_name='speed', step=1, callback_policy='value', sizing_mode = 'fixed')
+st_viz.add_numerical_filter(title='Speed (knots)', filter_mode='>=', numeric_name='speed', step=1, callback_policy='value')
 
 st_viz.figure.legend.location = "top_left"
 st_viz.figure.legend.click_policy = "mute"
 st_viz.figure.toolbar.active_scroll = st_viz.figure.select_one(WheelZoomTool)
 
-st_viz.show_figures(notebook=False, sizing_mode='stretch_both')
+st_viz.show_figures(notebook=False)
