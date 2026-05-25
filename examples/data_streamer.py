@@ -13,7 +13,7 @@ import argparse
 def simulate_kafka_stream(
     csv_path,
     topic="test_topic",
-    bootstrap_servers="localhost:9092",
+    bootstrap_servers="kafka:29092",
     key_field=None,
     delay=0.01
 ):
@@ -38,11 +38,15 @@ def simulate_kafka_stream(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", choices=["categorical", "numerical"], required=True)
-    parser.add_argument("--topic", default="st-viz-topic")
+    parser.add_argument("--mode", choices=["categorical", "numerical"], default=None)
+    parser.add_argument("--topic", default=None)
+    parser.add_argument("--bootstrap-servers", default="kafka:29092")
     args = parser.parse_args()
 
-    if args.mode == "categorical":
-        simulate_kafka_stream(env['CATEGORICAL_SUBSET_DEMO_STREAMER'], args.topic)
-    elif args.mode == "numerical":
-        simulate_kafka_stream(env['NUMERICAL_SUBSET_DEMO_STREAMER'], args.topic)
+    mode = args.mode or os.environ.get("STREAM_MODE", "numerical")
+    topic = args.topic or os.environ.get("STREAM_TOPIC", "st-viz-topic")
+
+    if mode == "categorical":
+        simulate_kafka_stream(env['CATEGORICAL_SUBSET_DEMO_STREAMER'], topic, args.bootstrap_servers)
+    elif mode == "numerical":
+        simulate_kafka_stream(env['NUMERICAL_SUBSET_DEMO_STREAMER'], topic, args.bootstrap_servers)

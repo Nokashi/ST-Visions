@@ -26,10 +26,22 @@ services:
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:29092
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
-
     healthcheck:
       test: ["CMD", "kafka-topics", "--list", "--bootstrap-server", "localhost:29092"]
       interval: 5s
       timeout: 10s
       retries: 5
+
+  data-streamer:
+      build: .
+      command: python data_streamer.py
+      env_file: .env
+      environment:
+        - STREAM_MODE=${STREAM_MODE:-numerical}
+        - STREAM_TOPIC=${STREAM_TOPIC:-st-viz-topic}
+      volumes:
+        - ./data:/app/data
+      depends_on:
+        kafka:
+          condition: service_healthy
 

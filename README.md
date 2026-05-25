@@ -74,8 +74,8 @@ plot.figure.toolbar.active_scroll = plot.figure.select_one(viz.WheelZoomTool)
 
 ```Python
 import pandas as pd
-from visualization.st_visualizer import st_visualizer
-import express.st_vizexpress as viz_express
+from st_visions.visualization.st_visualizer import st_visualizer
+import st_visions.express.st_vizexpress as viz_express
 
 # Load Dataset (Pandas DataFrame)
 data = pd.read_csv("<PATH-TO-CSV-FILE>")
@@ -96,8 +96,8 @@ ST_Visions can also be used to hook into a data stream and visualize the receivi
 ```Python
 
 import pyarrow as pa
-from visualization.st_visualizer import st_visualizer 
-from streaming.st_vizstream import ST_KafkaStream 
+from st_visions.visualization.st_visualizer import st_visualizer 
+from st_visions.streaming.st_vizstream import ST_KafkaStream 
 
 # Initialize the schema we expect to receive from the data stream
 expected_schema = pa.schema([
@@ -149,8 +149,8 @@ stream_plot.figure.toolbar.active_scroll = plot.figure.select_one(viz.WheelZoomT
 
 ```Python
 
-from visualization.st_visualizer import st_visualizer
-import express.st_vizexpress as viz_express
+from st_visions.visualization.st_visualizer import st_visualizer
+import st_visions.express.st_vizexpress as viz_express
 import pyarrow as pa
 
 # Initialize the schema we expect to receive from the data stream
@@ -168,7 +168,7 @@ expected_schema = pa.schema([
 stream_plot = st_visualizer(limit=7500, expected_schema=expected_schema)
 
 # Hook into the stream and visualize the ingested data
-viz_express.plot_streaming_data_on_map(stream_plot, topic_name='st-viz-topic', tools=['lasso_select'], sizing_mode='fixed', width=1600, tooltips=tooltips)
+viz_express.plot_streaming_data_on_map_kafka(stream_plot, topic_name='st-viz-topic', tools=['lasso_select'], sizing_mode='fixed', width=1600, tooltips=tooltips)
 
 ```
 
@@ -187,7 +187,7 @@ plot.show_figures(notebook=False, live=True)
 
 ## Documentation
 ---
-To learn more about ```ST_Visions``` and its capabilities, please consult the technical report at ```./doc/report.pdf```. Example codes that show both baseline and advanced use-cases, can be found at ```./examples/ipynb/``` for Jupyter Notebooks and ```./examples/py/``` for Python Scripts.
+To learn more about ```ST_Visions``` and its capabilities, please consult the technical report at ```./doc/report.pdf```. Example codes that show both baseline and advanced use-cases, can be found at ```./examples/ipynb/``` for Jupyter Notebooks and ```./examples/py/``` for Python Scripts. Keep in mind that if ```ST_Visions``` was installed as a package, you will need to download the example folder seperately in order to access these examples.
 
 
 ## Contributors
