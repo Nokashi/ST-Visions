@@ -144,6 +144,11 @@ docker compose run --rm --env STREAM_MODE=numerical data-streamer
 
 To stop the streaming demo press `CTRL + C` on both the data streamer and the terminal running the `bokeh serve` command
 
+Then terminate the kafka container
+```bash
+docker compose down
+```
+
 ### Notes 
 * The streaming visualization depends on an active data stream; without it, the figure will remain idle.
 * For best results, stop the data streamer before shutting down the Bokeh server.
@@ -175,7 +180,3 @@ To stop the streaming demo press `CTRL + C` on both the data streamer and the te
 | PY8-multiple_datasets | Handling multiple datasets on the same figure |
 
 
-## Stopping the kafka image
-```bash
-docker compose down
-```
