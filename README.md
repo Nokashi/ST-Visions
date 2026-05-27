@@ -3,7 +3,6 @@
 
 
 ## Overview
----
 ST_Visions (**S**patio-**T**emporal **Vis**ualizat**ions**) is a python library, able to interactively visualize spatio-temporal data in a quick-and-easy way. Based upon the functionality of [Bokeh](https://docs.bokeh.org/en/latest/index.html#), and further extending it, we are able to create powerful and cohesive visualizations (and/or online dashboards), for large or streaming spatio-temporal datasets.
 
 ## Installation
@@ -42,7 +41,6 @@ sys.path.append("/path/to/st-visions")
 ```
 
 ## Usage
----
 ST_Visions can be used in two variations, depending on the use-case. For baseline visualizations, the module ```st_vizexpress.py``` provides 4 methods for visualizing Point, (Multi)Polygon, (Multi)Line datasets and data streams, respectively. For example, to visualize a Point geometry dataset:
 
 * Using ```st_visualizer.py``` module: 
@@ -186,16 +184,17 @@ plot.show_figures(notebook=False, live=True)
 ```
 
 ## Documentation
----
 To learn more about ```ST_Visions``` and its capabilities, please consult the technical report at ```./doc/report.pdf```. Example codes that show both baseline and advanced use-cases, can be found at ```./examples/ipynb/``` for Jupyter Notebooks and ```./examples/py/``` for Python Scripts. Keep in mind that if ```ST_Visions``` was installed as a package, you will need to download the example folder seperately in order to access these examples.
 
 
 ## Contributors
----
 Andreas Tritsarolis, Christos Doulkeridis, Yannis Theodoridis and Nikos Pelekis; Data Science Lab., University of Piraeus
 Paraschos Moraitis, Department of Informatics, University of Piraeus
 
+## Citation
+If you use ST_Visions in your project, we would appreciate citations to the following paper:
+
+> Andreas Tritsarolis, Christos Doulkeridis, Nikos Pelekis, and Yannis Theodoridis. 2021. ST_Visions: A Python Library for Interactive Visualization of Spatio-temporal Data. In Proceedings of the 22nd IEEE International Conference on Mobile Data Management (MDM). 
 
 ## Acknowledgement
----
 This  project  has  received  funding  from  the  Hellenic Foundation for Research and Innovation (HFRI) and the General Secretariat for Research and Technology (GSRT), under grant agreement No 1667, from 2018 National Funds Programme of the GSRT, and from EU/H2020 project VesselAI (grant agreement No 957237).
