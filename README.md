@@ -189,6 +189,7 @@ To learn more about ```ST_Visions``` and its capabilities, please consult the te
 
 ## Contributors
 Andreas Tritsarolis, Christos Doulkeridis, Yannis Theodoridis and Nikos Pelekis; Data Science Lab., University of Piraeus
+
 Paraschos Moraitis, Department of Informatics, University of Piraeus
 
 ## Citation
